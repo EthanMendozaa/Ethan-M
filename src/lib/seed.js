@@ -67,7 +67,10 @@ function buildMeals(rand, noise, isWeekend, upToMeal = null) {
     const qty = 0.92 + rand() * 0.3
     const items = []
     if (slot === 'breakfast') {
-      items.push(pick(rand, FOODS.breakfast), FOODS.breakfast[0])
+      // Two distinct items so the log never shows a duplicate line
+      const a = Math.floor(rand() * FOODS.breakfast.length)
+      const b = (a + 1 + Math.floor(rand() * (FOODS.breakfast.length - 1))) % FOODS.breakfast.length
+      items.push(FOODS.breakfast[a], FOODS.breakfast[b])
     } else {
       items.push(pick(rand, FOODS[slot]))
     }

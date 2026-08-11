@@ -26,7 +26,10 @@ Builds as a static site (`npm run build`) — deployable straight to Vercel.
 ## Try the cross-learning loops
 
 1. **Today → Weigh-in:** enter a weight; watch the trend + TDEE nudge instantly
-   (a toast shows the exact delta).
+   (a toast shows the exact delta). Tap **Details →** for the full Weight
+   screen: hero trend number, goal projection with estimated finish date,
+   range-filtered chart, weigh-in streak, and a "drops" feed that celebrates
+   every pound milestone crossed on the way down.
 2. **Today → Readiness card:** the suggestion text is computed from today's
    recovery score (rest-day / reduced-volume / as-programmed / bonus-set).
 3. **Train → Start session:** log sets (ghost values, rest timer, plate
@@ -45,7 +48,7 @@ Builds as a static site (`npm run build`) — deployable straight to Vercel.
 | `src/lib/derived.js` | All the "intelligence": trend weight, TDEE, 4 scores, muscle recovery, readiness, e1RM, XP |
 | `src/lib/insights.js` | Stats cards computed from the data (null if unsupported) |
 | `src/lib/store.jsx` | Seed + localStorage overlay of user actions |
-| `src/screens/` | Today, Nutrition, Train, Stats, Profile |
+| `src/screens/` | Today, Nutrition, Train, Stats, Profile + WeightDetail overlay |
 | `docs/PLAN.md` | Original build plan |
 | `docs/DECISIONS.md` | Plan review — issues found and how they were resolved |
 

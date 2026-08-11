@@ -42,7 +42,7 @@ const TABS = [
 
 export default function TabBar({ active, onChange }) {
   return (
-    <nav className="relative z-30 flex items-end justify-around border-t border-hairline bg-page/95 px-2 pb-5 pt-2 backdrop-blur">
+    <nav className="relative z-10 flex items-end justify-around border-t border-hairline bg-page/95 px-2 pb-5 pt-2 backdrop-blur">
       {TABS.map((tab) =>
         tab.center ? (
           <button

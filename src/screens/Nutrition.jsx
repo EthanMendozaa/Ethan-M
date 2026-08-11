@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  ComposedChart,
   Line,
-  Scatter,
   LineChart,
   XAxis,
   YAxis,
@@ -18,9 +16,11 @@ import {
   tdeeAt,
   weeklyCheckIn,
   macroTargets,
+  weightJourney,
 } from '../lib/derived'
 import { Card, Chip, SectionTitle, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
+import Sparkline from '../components/Sparkline'
 import { AXIS, GRID, ChartTooltip } from '../components/charts'
 
 const QUICK_FOODS = [
@@ -58,7 +58,7 @@ const SLOT_LABELS = {
   logged: 'Quick add',
 }
 
-export default function Nutrition() {
+export default function Nutrition({ onOpenWeight }) {
   const { days, today, todayKey, dispatch } = useStore()
   const toast = useToast()
   const [sheet, setSheet] = useState(null)
@@ -72,11 +72,13 @@ export default function Nutrition() {
     () => tdeeSeries(days).map((p) => ({ ...p, label: shortDate(p.key) })),
     [days],
   )
-  const weightData = useMemo(
+  const journey = useMemo(() => weightJourney(days), [days])
+  const weightSpark = useMemo(
     () =>
       trendWeightSeries(days)
-        .filter((p) => p.scale != null || p.trend != null)
-        .map((p) => ({ ...p, label: shortDate(p.key) })),
+        .filter((p) => p.trend != null)
+        .slice(-30)
+        .map((p) => p.trend),
     [days],
   )
 
@@ -186,35 +188,29 @@ export default function Nutrition() {
       )}
 
       <SectionTitle>Weight</SectionTitle>
-      <Card>
-        <div className="h-40">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={weightData} margin={{ top: 4, right: 6, left: 0, bottom: 0 }}>
-              <CartesianGrid {...GRID} />
-              <XAxis dataKey="label" {...AXIS} interval={Math.floor(weightData.length / 3)} />
-              <YAxis {...AXIS} domain={['dataMin - 1', 'dataMax + 1']} width={40} />
-              <Tooltip content={<ChartTooltip formatter={(v) => `${v} lb`} />} />
-              <Scatter dataKey="scale" name="Scale" fill="var(--color-ink-3)" opacity={0.55} r={2} />
-              <Line
-                type="monotone"
-                dataKey="trend"
-                name="Trend"
-                stroke="var(--color-series-1)"
-                strokeWidth={2}
-                dot={false}
-                connectNulls
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="mt-1 flex items-center gap-4 text-[11px] text-ink-3">
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-ink-3" /> Scale weight
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-0.5 w-3 rounded-full bg-series-1" /> Trend
+      <Card onClick={onOpenWeight} className="flex items-center gap-4 !py-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[24px] font-bold text-ink">{journey?.now.toFixed(1)}</span>
+            <span className="text-[12px] text-ink-3">lb trend</span>
+          </div>
+          <span
+            className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              journey?.weekDelta < -0.05 ? 'bg-good/15 text-good' : 'bg-surface-2 text-ink-2'
+            }`}
+          >
+            {journey?.weekDelta < -0.05 ? '↓' : '→'} {Math.abs(journey?.weekDelta ?? 0).toFixed(1)}{' '}
+            lb this wk
           </span>
         </div>
+        <Sparkline
+          data={weightSpark}
+          width={90}
+          height={32}
+          color="var(--color-ink-3)"
+          accent="var(--color-series-1)"
+        />
+        <span className="text-ink-3">›</span>
       </Card>
 
       <SectionTitle

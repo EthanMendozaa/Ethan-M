@@ -62,7 +62,7 @@ function Vital({ label, value, unit }) {
   )
 }
 
-export default function Today({ onNavigate }) {
+export default function Today({ onNavigate, onOpenWeight }) {
   const { days, today, plannedSession, dispatch, todayKey } = useStore()
   const toast = useToast()
   const [sheet, setSheet] = useState(null)
@@ -229,9 +229,14 @@ export default function Today({ onNavigate }) {
           <span className="text-[12px] text-ink-3">
             Trend {lastTrend?.trend.toFixed(1)} lb · TDEE {tdee?.toLocaleString()} kcal
           </span>
-          <button onClick={() => setSheet('weigh')} className="text-[12px] font-medium text-series-1">
-            Why?
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSheet('weigh')} className="text-[12px] font-medium text-ink-3">
+              Why?
+            </button>
+            <button onClick={onOpenWeight} className="text-[12px] font-semibold text-series-1">
+              Details →
+            </button>
+          </div>
         </div>
       </Card>
 

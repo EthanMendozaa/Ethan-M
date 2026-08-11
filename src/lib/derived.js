@@ -18,6 +18,74 @@ export function trendWeightSeries(days) {
   return out
 }
 
+// Weight-journey stats for the dedicated Weight screen.
+export function weightJourney(days, goalLb = 145) {
+  const trend = trendWeightSeries(days).filter((t) => t.trend != null)
+  if (trend.length < 8) return null
+  const now = trend[trend.length - 1].trend
+  const start = trend[0].trend
+  const weekAgo = trend[Math.max(0, trend.length - 8)].trend
+  const monthAgo = trend[Math.max(0, trend.length - 29)].trend
+  const weekDelta = Math.round((now - weekAgo) * 10) / 10
+  const span = Math.min(28, trend.length - 1)
+  const ratePerWeek = Math.round(((now - monthAgo) / span) * 7 * 100) / 100
+  // Projected goal date at the current 28-day rate
+  let goalKey = null
+  if (ratePerWeek < -0.05 && now > goalLb) {
+    const daysLeft = Math.round((now - goalLb) / (-ratePerWeek / 7))
+    if (daysLeft < 400) goalKey = addDaysKey(trend[trend.length - 1].key, daysLeft)
+  }
+  return {
+    now,
+    start,
+    weekDelta,
+    ratePerWeek,
+    totalDelta: Math.round((now - start) * 10) / 10,
+    goalLb,
+    goalKey,
+    toGo: Math.round((now - goalLb) * 10) / 10,
+    progress: Math.max(0, Math.min(1, (start - now) / Math.max(0.1, start - goalLb))),
+  }
+}
+
+// Every whole-pound line crossed on the way down ("drops"), newest first.
+export function weightMilestones(days) {
+  const trend = trendWeightSeries(days).filter((t) => t.trend != null)
+  const seen = new Set()
+  const out = []
+  for (let i = 1; i < trend.length; i++) {
+    const prev = trend[i - 1].trend
+    const cur = trend[i].trend
+    for (let m = Math.floor(prev); m > cur; m--) {
+      if (prev >= m && cur < m && !seen.has(m)) {
+        seen.add(m)
+        out.push({ lb: m, key: trend[i].key })
+      }
+    }
+  }
+  return out.reverse()
+}
+
+// Consecutive days with a logged weigh-in (today pending doesn't break it).
+export function weighInStreak(days) {
+  let streak = 0
+  for (let i = days.length - 1; i >= 0; i--) {
+    if (days[i].isToday && days[i].weightLb == null) continue
+    if (days[i].weightLb != null) streak += 1
+    else break
+  }
+  return streak
+}
+
+function addDaysKey(key, n) {
+  const d = keyToDate(key)
+  d.setDate(d.getDate() + n)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
 // ---------- TDEE ----------
 // Displayed expenditure recomputes continuously over the trailing 14 days of
 // intake + trend-weight change (so a new weigh-in nudges it immediately).

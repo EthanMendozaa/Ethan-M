@@ -4,7 +4,7 @@ export function Card({ children, className = '', onClick, flash }) {
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl bg-surface p-4 ${onClick ? 'cursor-pointer active:scale-[0.99] transition-transform' : ''} ${flash ? 'flash-update' : ''} ${className}`}
+      className={`rounded-2xl bg-surface p-4 shadow-md shadow-black/20 ring-1 ring-white/[0.04] ${onClick ? 'cursor-pointer active:scale-[0.99] transition-transform' : ''} ${flash ? 'flash-update' : ''} ${className}`}
     >
       {children}
     </div>
