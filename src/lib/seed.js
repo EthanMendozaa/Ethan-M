@@ -259,6 +259,7 @@ export function plannedSessionFor(world, key) {
       return {
         name: ex.name,
         muscles: meta.muscles,
+        superset: ex.superset ?? null,
         targetSets: ex.sets + 1 * (idx < 3 ? 1 : 0), // block-2 volume
         targetReps: ex.reps,
         prevSets: prev ? prev.sets : null,

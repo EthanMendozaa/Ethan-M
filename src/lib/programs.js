@@ -59,11 +59,12 @@ export const ARNOLD_DAYS = [
   {
     name: 'Chest + Back',
     exercises: [
-      { name: 'Barbell Bench Press', sets: 3, reps: 6, startLoad: 175 },
-      { name: 'Incline DB Press', sets: 3, reps: 10, startLoad: 60 },
+      // Arnold's signature chest/back supersets
+      { name: 'Barbell Bench Press', sets: 3, reps: 6, startLoad: 175, superset: 'A' },
+      { name: 'Barbell Row', sets: 3, reps: 8, startLoad: 155, superset: 'A' },
+      { name: 'Incline DB Press', sets: 3, reps: 10, startLoad: 60, superset: 'B' },
+      { name: 'Lat Pulldown', sets: 3, reps: 10, startLoad: 140, superset: 'B' },
       { name: 'Cable Fly', sets: 3, reps: 12, startLoad: 42.5 },
-      { name: 'Barbell Row', sets: 3, reps: 8, startLoad: 155 },
-      { name: 'Lat Pulldown', sets: 3, reps: 10, startLoad: 140 },
       { name: 'Seated Cable Row', sets: 2, reps: 12, startLoad: 130 },
     ],
   },
@@ -71,11 +72,11 @@ export const ARNOLD_DAYS = [
     name: 'Shoulders + Arms',
     exercises: [
       { name: 'Overhead Press', sets: 3, reps: 6, startLoad: 105 },
-      { name: 'Lateral Raise', sets: 4, reps: 12, startLoad: 20 },
-      { name: 'Rear Delt Fly', sets: 3, reps: 15, startLoad: 15 },
-      { name: 'EZ-Bar Curl', sets: 3, reps: 10, startLoad: 70 },
+      { name: 'Lateral Raise', sets: 4, reps: 12, startLoad: 20, superset: 'A' },
+      { name: 'Rear Delt Fly', sets: 3, reps: 15, startLoad: 15, superset: 'A' },
+      { name: 'EZ-Bar Curl', sets: 3, reps: 10, startLoad: 70, superset: 'B' },
+      { name: 'Cable Pushdown', sets: 3, reps: 12, startLoad: 57.5, superset: 'B' },
       { name: 'Hammer Curl', sets: 2, reps: 12, startLoad: 30 },
-      { name: 'Cable Pushdown', sets: 3, reps: 12, startLoad: 57.5 },
       { name: 'Overhead Extension', sets: 2, reps: 12, startLoad: 45 },
     ],
   },
