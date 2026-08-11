@@ -32,10 +32,15 @@ Builds as a static site (`npm run build`) — deployable straight to Vercel.
    every pound milestone crossed on the way down.
 2. **Today → Readiness card:** the suggestion text is computed from today's
    recovery score (rest-day / reduced-volume / as-programmed / bonus-set).
-3. **Train → Start session:** log sets (ghost values, rest timer, plate
-   calculator, RIR), finish, and watch muscle recovery, weekly volume, XP and
-   streak update.
-4. **Stats:** every insight card is *derived* from the seeded data — the
+3. **Train → Start session:** log sets (ghost values, docked rest timer, RIR,
+   drop sets, superset tags), swap any exercise for a same-muscle alternative
+   from the 70+ movement library, and load the bar with the interactive plate
+   calculator. Finish to update muscle recovery, weekly volume, XP and streak.
+4. **Train → Muscle map:** front/back body diagram with two modes — recovery
+   (fresh / recovering / fatigued, with a "fresh by" ETA per muscle) and
+   worked-this-week volume. The Week Ahead card projects each upcoming
+   session against every muscle's recovery curve.
+5. **Stats:** every insight card is *derived* from the seeded data — the
    correlations (short sleep → weaker top sets, volume ramp → higher TDEE,
    protein adherence → strength retention, deficit depth → HRV) are baked into
    the generator and computed back out.

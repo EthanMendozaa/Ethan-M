@@ -3,6 +3,8 @@ import { useStore } from '../lib/store'
 import {
   readiness,
   muscleRecoveryState,
+  recoveryEta,
+  upcomingSchedule,
   weeklyVolume,
   sessionStats,
   totalXP,
@@ -11,9 +13,11 @@ import {
   e1rm,
   e1rmSeries,
 } from '../lib/derived'
-import { PROGRAMS } from '../lib/programs'
+import { PROGRAMS, EXERCISES, MUSCLE_GROUPS } from '../lib/programs'
+import { weekday, shortDate } from '../lib/dates'
 import { Card, Chip, SectionTitle, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
+import BodyMap from '../components/BodyMap'
 import ActiveWorkout from './ActiveWorkout'
 
 const STATUS_META = {
@@ -22,22 +26,13 @@ const STATUS_META = {
   fatigued: { label: 'Fatigued', color: 'var(--color-serious)', tone: 'serious' },
 }
 
-function MuscleRow({ m }) {
-  const meta = STATUS_META[m.status]
-  return (
-    <div className="flex items-center gap-3 py-1.5">
-      <span className="w-24 shrink-0 text-[12px] text-ink-2">{m.muscle}</span>
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
-        <div
-          className="h-full rounded-full"
-          style={{ width: `${100 - m.fatiguePct}%`, background: meta.color }}
-        />
-      </div>
-      <span className="w-20 shrink-0 text-right text-[11px] font-medium" style={{ color: meta.color }}>
-        {meta.label}
-      </span>
-    </div>
-  )
+// Blue intensity steps for the "worked this week" map (dark-surface ordinal ramp)
+function volumeColor(sets, mev, mrv) {
+  if (sets <= 0) return 'var(--color-surface-3)'
+  if (sets < mev / 2) return '#184f95'
+  if (sets < mev) return '#256abf'
+  if (sets <= mrv) return '#3987e5'
+  return '#86b6ef'
 }
 
 function VolumeRow({ v }) {
@@ -100,6 +95,9 @@ export default function Train() {
   const [startedAt, setStartedAt] = useState(null)
   const [summary, setSummary] = useState(null)
   const [programSheet, setProgramSheet] = useState(null)
+  const [mapMode, setMapMode] = useState('recovery') // recovery | volume
+  const [selectedMuscle, setSelectedMuscle] = useState('Chest')
+  const [showLibrary, setShowLibrary] = useState(false)
 
   const ready = useMemo(
     () => readiness(days, today.session ? null : plannedSession?.dayName),
@@ -107,6 +105,7 @@ export default function Train() {
   )
   const recovery = useMemo(() => muscleRecoveryState(days, todayKey), [days, todayKey])
   const volume = useMemo(() => weeklyVolume(days), [days])
+  const schedule = useMemo(() => upcomingSchedule(days, todayKey), [days, todayKey])
   const xp = useMemo(() => totalXP(days, userState.bonusXP), [days, userState])
   const streak = useMemo(() => currentStreak(days), [days])
   const { level, progress } = levelFromXP(xp)
@@ -286,11 +285,126 @@ export default function Train() {
         )}
       </Card>
 
-      <SectionTitle>Muscle recovery</SectionTitle>
-      <Card>
-        {recovery.map((m) => (
-          <MuscleRow key={m.muscle} m={m} />
+      <SectionTitle
+        right={
+          <div className="flex overflow-hidden rounded-lg bg-surface">
+            {[
+              ['recovery', 'Recovery'],
+              ['volume', 'This week'],
+            ].map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => setMapMode(mode)}
+                className={`px-2.5 py-1 text-[11px] font-medium ${
+                  mapMode === mode ? 'bg-series-1 text-white' : 'text-ink-3'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        }
+      >
+        Muscle map
+      </SectionTitle>
+      <Card className="!p-5">
+        <BodyMap
+          selected={selectedMuscle}
+          onSelect={setSelectedMuscle}
+          colorFor={(muscle) => {
+            if (mapMode === 'volume') {
+              const v = volume.find((x) => x.muscle === muscle)
+              return volumeColor(v.sets, v.mev, v.mrv)
+            }
+            const r = recovery.find((x) => x.muscle === muscle)
+            return STATUS_META[r.status].color
+          }}
+        />
+        {/* Legend */}
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-hairline pt-3 text-[11px] text-ink-3">
+          {mapMode === 'recovery' ? (
+            Object.entries(STATUS_META).map(([k, meta]) => (
+              <span key={k} className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ background: meta.color }} />
+                {meta.label}
+              </span>
+            ))
+          ) : (
+            <>
+              {[
+                ['var(--color-surface-3)', 'none'],
+                ['#184f95', 'light'],
+                ['#256abf', 'moderate'],
+                ['#3987e5', 'in band'],
+                ['#86b6ef', 'high'],
+              ].map(([c, label]) => (
+                <span key={label} className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full" style={{ background: c }} />
+                  {label}
+                </span>
+              ))}
+            </>
+          )}
+        </div>
+        {/* Selected muscle detail */}
+        {selectedMuscle &&
+          (() => {
+            const r = recovery.find((x) => x.muscle === selectedMuscle)
+            const v = volume.find((x) => x.muscle === selectedMuscle)
+            const meta = STATUS_META[r.status]
+            return (
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-surface-2 px-4 py-3">
+                <div>
+                  <p className="text-[14px] font-semibold text-ink">{selectedMuscle}</p>
+                  <p className="text-[11px] text-ink-3">
+                    {v.sets} sets this week · band {v.mev}–{v.mrv}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <Chip tone={meta.tone}>{meta.label}</Chip>
+                  <p className="mt-1 text-[11px] text-ink-3">
+                    {r.status === 'fresh' ? 'Ready to train' : `Fresh ${recoveryEta(r.hoursToFresh)}`}
+                  </p>
+                </div>
+              </div>
+            )
+          })()}
+      </Card>
+
+      <SectionTitle>Week ahead</SectionTitle>
+      <Card className="!py-2">
+        {schedule.map((d, i) => (
+          <div
+            key={d.key}
+            className={`flex items-center justify-between border-b border-hairline py-2.5 last:border-0 ${
+              i === 0 ? '' : ''
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span
+                className={`w-9 text-[11px] font-semibold uppercase ${
+                  i === 0 ? 'text-series-1' : 'text-ink-3'
+                }`}
+              >
+                {i === 0 ? 'Today' : weekday(d.key)}
+              </span>
+              <span className={`text-[13px] ${d.name === 'Rest' ? 'text-ink-3' : 'font-medium text-ink'}`}>
+                {d.name}
+              </span>
+            </div>
+            {d.name !== 'Rest' &&
+              (d.ready ? (
+                <span className="text-[11px] font-medium text-good">Muscles ready ✓</span>
+              ) : (
+                <span className="text-[11px] font-medium text-warning">
+                  {d.blockers[0]} still recovering
+                </span>
+              ))}
+          </div>
         ))}
+        <p className="border-t border-hairline py-2.5 text-[11px] leading-snug text-ink-3">
+          Readiness is projected from each muscle's recovery curve at session time.
+        </p>
       </Card>
 
       <SectionTitle right={<span className="text-[11px] text-ink-3">band = MEV–MRV target</span>}>
@@ -330,6 +444,17 @@ export default function Train() {
         ))}
       </div>
 
+      <SectionTitle>Exercises</SectionTitle>
+      <Card onClick={() => setShowLibrary(true)} className="flex items-center justify-between py-3">
+        <div>
+          <p className="text-[14px] font-semibold text-ink">Exercise library</p>
+          <p className="text-[11px] text-ink-3">
+            {Object.keys(EXERCISES).length} movements · swap any exercise mid-workout
+          </p>
+        </div>
+        <span className="text-ink-3">›</span>
+      </Card>
+
       <Sheet
         open={programSheet != null}
         onClose={() => setProgramSheet(null)}
@@ -343,6 +468,21 @@ export default function Train() {
               <Chip>{programSheet.daysPerWeek} days/week</Chip>
               <Chip>{programSheet.level}</Chip>
             </div>
+            {programSheet.sampleDay && (
+              <div className="mt-4 rounded-xl bg-surface-3 p-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-3">
+                  Sample day · {programSheet.sampleDay.title}
+                </p>
+                {programSheet.sampleDay.exercises.map((name) => (
+                  <div key={name} className="flex items-center justify-between py-1">
+                    <span className="text-[13px] text-ink">{name}</span>
+                    <span className="text-[11px] capitalize text-ink-3">
+                      {EXERCISES[name]?.equipment}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             {programSheet.id !== 'arnold-split' && (
               <button
                 onClick={() => {
@@ -356,6 +496,34 @@ export default function Train() {
             )}
           </>
         )}
+      </Sheet>
+
+      <Sheet open={showLibrary} onClose={() => setShowLibrary(false)} title="Exercise library">
+        <p className="mb-3 text-[12px] text-ink-3">
+          {Object.keys(EXERCISES).length} movements across {MUSCLE_GROUPS.length} muscle groups.
+          During a workout, ⇄ Swap offers same-muscle alternatives.
+        </p>
+        {MUSCLE_GROUPS.map((group) => {
+          const list = Object.entries(EXERCISES).filter(([, m]) => m.muscles[0] === group)
+          return (
+            <div key={group} className="mb-4">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">
+                {group} · {list.length}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {list.map(([name, meta]) => (
+                  <span
+                    key={name}
+                    className="rounded-full bg-surface-3 px-2.5 py-1 text-[11px] text-ink-2"
+                  >
+                    {name}
+                    {meta.main && <span className="ml-1 text-series-1">★</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </Sheet>
 
       {view === 'active' && logger && (

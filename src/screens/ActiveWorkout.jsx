@@ -2,9 +2,11 @@
 // exercise cards with ghost values, drop sets, superset tags, and a docked
 // rest timer. Arrow-style feedback, STNDRD-style structure and air.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Chip, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
+import PlateCalculator from '../components/PlateCalculator'
+import { alternativesFor } from '../lib/programs'
 
 function roundTo(load, inc) {
   const step = inc || 2.5
@@ -39,39 +41,6 @@ function Stepper({ value, onChange, step = 1, wide }) {
   )
 }
 
-function PlateCalc({ load }) {
-  const perSide = Math.max(0, (load - 45) / 2)
-  const plates = []
-  let rem = perSide
-  for (const p of [45, 35, 25, 10, 5, 2.5]) {
-    while (rem >= p - 0.01) {
-      plates.push(p)
-      rem -= p
-    }
-  }
-  return (
-    <div>
-      <p>
-        <span className="font-semibold text-ink">{load} lb</span> on a 45 lb bar →{' '}
-        <span className="font-semibold text-ink">{plates.join(' + ') || 'empty bar'}</span> per side.
-      </p>
-      <div className="mt-3 flex items-center gap-1">
-        <div className="h-1.5 w-10 rounded bg-surface-3" />
-        {plates.map((p, i) => (
-          <div
-            key={i}
-            className="flex items-center justify-center rounded-sm bg-series-1/80 text-[9px] font-bold text-white"
-            style={{ height: `${18 + p}px`, width: p >= 25 ? 14 : 10 }}
-          >
-            {p}
-          </div>
-        ))}
-        <div className="h-1.5 w-16 rounded bg-surface-3" />
-      </div>
-    </div>
-  )
-}
-
 const REST_SECONDS = 90
 
 export default function ActiveWorkout({
@@ -87,6 +56,7 @@ export default function ActiveWorkout({
   const [now, setNow] = useState(Date.now())
   const [rest, setRest] = useState(null) // { until, total }
   const [plateSheet, setPlateSheet] = useState(null)
+  const [swapSheet, setSwapSheet] = useState(null) // exercise index
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
@@ -137,6 +107,26 @@ export default function ActiveWorkout({
       }),
     )
     if (drop) toast('Drop set added — strip ~20% and go')
+  }
+
+  function swapExercise(exIdx, alt) {
+    setLogger((prev) =>
+      prev.map((ex, i) => {
+        if (i !== exIdx) return ex
+        return {
+          name: alt.name,
+          muscles: alt.muscles,
+          superset: ex.superset,
+          increment: alt.increment || 2.5,
+          ghost: null,
+          sets: ex.sets
+            .filter((s) => !s.drop)
+            .map((s) => ({ reps: s.reps, load: alt.defaultLoad ?? 0, rir: 2, done: false, bonus: s.bonus })),
+        }
+      }),
+    )
+    setSwapSheet(null)
+    toast(`Swapped to ${alt.name}`)
   }
 
   return (
@@ -217,12 +207,21 @@ export default function ActiveWorkout({
                       <span className="text-[11px] text-ink-3">{ex.muscles.join(' · ')}</span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setPlateSheet(Math.max(...ex.sets.map((s) => s.load)))}
-                    className="shrink-0 rounded-full bg-surface-2 px-3 py-1.5 text-[11px] font-medium text-ink-2"
-                  >
-                    Plates
-                  </button>
+                  <div className="flex shrink-0 gap-1.5">
+                    <button
+                      onClick={() => setSwapSheet(exIdx)}
+                      className="rounded-full bg-surface-2 px-3 py-1.5 text-[11px] font-medium text-ink-2"
+                      title="Swap exercise"
+                    >
+                      ⇄ Swap
+                    </button>
+                    <button
+                      onClick={() => setPlateSheet(Math.max(...ex.sets.map((s) => s.load)))}
+                      className="rounded-full bg-surface-2 px-3 py-1.5 text-[11px] font-medium text-ink-2"
+                    >
+                      Plates
+                    </button>
+                  </div>
                 </div>
 
                 {ex.ghost && (
@@ -352,7 +351,36 @@ export default function ActiveWorkout({
       )}
 
       <Sheet open={plateSheet != null} onClose={() => setPlateSheet(null)} title="Plate calculator">
-        {plateSheet != null && <PlateCalc load={plateSheet} />}
+        {plateSheet != null && <PlateCalculator initialLoad={plateSheet} />}
+      </Sheet>
+
+      <Sheet
+        open={swapSheet != null}
+        onClose={() => setSwapSheet(null)}
+        title={swapSheet != null ? `Swap ${logger[swapSheet].name}` : ''}
+      >
+        {swapSheet != null && (
+          <div className="flex flex-col gap-2">
+            <p className="mb-1 text-[12px] text-ink-3">
+              Same target muscle ({logger[swapSheet].muscles[0]}), your equipment first:
+            </p>
+            {alternativesFor(logger[swapSheet].name).map((alt) => (
+              <button
+                key={alt.name}
+                onClick={() => swapExercise(swapSheet, alt)}
+                className="flex items-center justify-between rounded-xl bg-surface-3 px-4 py-3 text-left"
+              >
+                <div>
+                  <p className="text-[14px] font-medium text-ink">{alt.name}</p>
+                  <p className="text-[11px] capitalize text-ink-3">{alt.equipment}</p>
+                </div>
+                <span className="text-[12px] text-ink-3">
+                  {alt.defaultLoad ? `${alt.defaultLoad} lb` : 'BW'}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </Sheet>
     </div>
   )

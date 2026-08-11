@@ -2,7 +2,7 @@
 // Every number the UI shows as smart is computed here from the day records.
 
 import { keyToDate, DAY_MS } from './dates'
-import { VOLUME_BAND, MUSCLE_GROUPS, MAIN_LIFTS, EXERCISES } from './programs'
+import { VOLUME_BAND, MUSCLE_GROUPS, MAIN_LIFTS, EXERCISES, ARNOLD_DAYS } from './programs'
 
 // ---------- Trend weight (EWMA, α = 0.25) ----------
 
@@ -295,12 +295,55 @@ export function muscleRecoveryState(days, nowKey) {
   return MUSCLE_GROUPS.map((g) => {
     const f = fatigue[g]
     const pct = Math.round(clamp01(f / 7) * 100)
+    // Hours until fatigue decays under the "fresh" threshold (pct 25 → f 1.75)
+    const freshAt = 0.25 * 7
+    const hoursToFresh = f > freshAt ? Math.round(TAU_HOURS * Math.log(f / freshAt)) : 0
     return {
       muscle: g,
       fatiguePct: pct,
       status: pct > 55 ? 'fatigued' : pct > 25 ? 'recovering' : 'fresh',
+      hoursToFresh,
     }
   })
+}
+
+// "Fresh now" / "~6h" / "tomorrow AM" — human label for a recovery ETA.
+export function recoveryEta(hoursToFresh) {
+  if (hoursToFresh <= 0) return 'Fresh now'
+  if (hoursToFresh <= 12) return `~${hoursToFresh}h`
+  const target = new Date(Date.now() + hoursToFresh * 3600 * 1000)
+  const today = new Date()
+  const dayDiff = Math.round(
+    (new Date(target.getFullYear(), target.getMonth(), target.getDate()) -
+      new Date(today.getFullYear(), today.getMonth(), today.getDate())) /
+      DAY_MS,
+  )
+  const half = target.getHours() < 12 ? 'AM' : 'PM'
+  if (dayDiff <= 0) return 'tonight'
+  if (dayDiff === 1) return `tomorrow ${half}`
+  return `${target.toLocaleDateString('en-US', { weekday: 'short' })} ${half}`
+}
+
+// Next 7 days of the split, each cross-checked against projected muscle
+// recovery on that day (recovery → scheduling cross-learning).
+export function upcomingSchedule(days, todayKey) {
+  const out = []
+  for (let i = 0; i < 7; i++) {
+    const key = addDaysKey(todayKey, i)
+    const dow = keyToDate(key).getDay()
+    const template = dow === 0 ? null : ARNOLD_DAYS[(dow - 1) % 3]
+    if (!template) {
+      out.push({ key, name: 'Rest', ready: true, blockers: [] })
+      continue
+    }
+    const primaries = [...new Set(template.exercises.map((ex) => EXERCISES[ex.name].muscles[0]))]
+    const rec = muscleRecoveryState(days, key)
+    const blockers = primaries.filter(
+      (m) => rec.find((r) => r.muscle === m)?.status === 'fatigued',
+    )
+    out.push({ key, name: template.name, ready: blockers.length === 0, blockers })
+  }
+  return out
 }
 
 // ---------- Weekly volume per muscle group vs MEV–MRV band ----------
