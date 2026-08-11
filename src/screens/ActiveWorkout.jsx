@@ -350,7 +350,7 @@ export default function ActiveWorkout({
         </div>
       )}
 
-      <Sheet open={plateSheet != null} onClose={() => setPlateSheet(null)} title="Plate calculator">
+      <Sheet open={plateSheet != null} onClose={() => setPlateSheet(null)}>
         {plateSheet != null && <PlateCalculator initialLoad={plateSheet} />}
       </Sheet>
 

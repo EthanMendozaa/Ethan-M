@@ -308,6 +308,26 @@ export default function Train() {
         Muscle map
       </SectionTitle>
       <Card className="!p-5">
+        <p className="mb-4 text-center text-[14px] font-semibold text-ink">
+          {mapMode === 'volume' ? (
+            <>
+              <span className="text-series-1">
+                {Math.round(
+                  (volume.filter((v) => v.sets > 0).length / volume.length) * 100,
+                )}
+                %
+              </span>{' '}
+              muscles worked this week
+            </>
+          ) : (
+            <>
+              <span className="text-good">
+                {recovery.filter((r) => r.status === 'fresh').length}/{recovery.length}
+              </span>{' '}
+              muscle groups fresh
+            </>
+          )}
+        </p>
         <BodyMap
           selected={selectedMuscle}
           onSelect={setSelectedMuscle}
