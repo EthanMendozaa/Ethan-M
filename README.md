@@ -58,3 +58,7 @@ Builds as a static site (`npm run build`) — deployable straight to Vercel.
 | `docs/DECISIONS.md` | Plan review — issues found and how they were resolved |
 
 Stack: Vite + React, Tailwind CSS v4, Recharts. Dark theme, ~390px phone frame.
+
+Anatomical body-map path data adapted from
+[react-native-body-highlighter](https://github.com/HichamELBSI/react-native-body-highlighter)
+(MIT © ELABBASSI Hicham).
