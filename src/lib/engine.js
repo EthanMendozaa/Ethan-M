@@ -15,6 +15,18 @@
 
 import { tdeeAt, muscleRecoveryState, weeklyVolume, e1rmSeries, trendWeightSeries } from './derived'
 import { EXERCISES, VOLUME_BAND, MAIN_LIFTS } from './programs'
+import { keyToDate, DAY_MS } from './dates'
+
+// Weekly check-in cadence: unlocks 7 days after the last accepted/declined
+// check-in; a reached goal unlocks immediately.
+export function checkInStatus(lastCheckIn, todayKey, coachStatus) {
+  const daysToNext = lastCheckIn
+    ? Math.max(0, 7 - Math.round((keyToDate(todayKey) - keyToDate(lastCheckIn)) / DAY_MS))
+    : 0
+  const due =
+    coachStatus !== 'collecting' && (daysToNext === 0 || coachStatus === 'goal-reached')
+  return { due, daysToNext }
+}
 
 export const REFERENCES = {
   epley1985: 'Epley B (1985). Poundage chart. Boyd Epley Workout.',

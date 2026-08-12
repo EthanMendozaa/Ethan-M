@@ -18,6 +18,7 @@ const defaultUserState = {
   calorieTarget: 2050, // updated when the user applies a coach suggestion
   goal: { phase: 'cut', goalWeight: 145, weeklyRateLb: -0.96, startKey: null }, // the plan the coach steers toward
   goalHistory: [], // archived phases: { phase, startKey, endKey, startWeight, endWeight }
+  lastCheckIn: null, // date key of the last accepted/declined weekly check-in
   activeProgramId: 'arnold-split',
   settings: { units: 'lb', notifications: true },
   onboarded: false,
@@ -146,6 +147,8 @@ function reducer(state, action) {
       }
     case 'setCalorieTarget':
       return { ...state, calorieTarget: action.target }
+    case 'recordCheckIn':
+      return { ...state, lastCheckIn: action.key }
     case 'setGoal':
       return {
         ...state,

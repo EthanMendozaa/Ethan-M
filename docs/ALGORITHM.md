@@ -172,9 +172,12 @@ Guardrails, in priority order:
    continuous for fat loss with better lean-mass outcomes in trained
    adults (Peos 2021).
 
-Suggestions are surfaced with an explicit **Apply** step — the engine never
-silently changes what the user is aiming at — and each carries its
-rationale chain like every other engine output.
+Suggestions run on a **weekly check-in cadence**: the coach recomputes
+continuously, but a program update is only offered once per 7 days
+(accepting *or* declining silences it until the next one; a reached goal
+unlocks immediately). Changes always require an explicit **Accept** — the
+engine never silently changes what the user is aiming at — and each
+update carries its rationale chain like every other engine output.
 
 ## Limitations (read before trusting it further)
 

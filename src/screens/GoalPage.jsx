@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react'
 import { useStore } from '../lib/store'
 import { shortDate, addDays } from '../lib/dates'
 import { trendWeightSeries, macroTargets } from '../lib/derived'
-import { calorieCoach, REFERENCES } from '../lib/engine'
+import { calorieCoach, checkInStatus, REFERENCES } from '../lib/engine'
 import { Card, Chip, SectionTitle, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
 
@@ -72,8 +72,13 @@ export default function GoalPage({ onClose }) {
   const startKey = goal.startKey ?? days[0].key
   const ratePct = bw ? Math.round((Math.abs(goal.weeklyRateLb) / bw) * 1000) / 10 : 0
 
-  const hasSuggestion =
-    (coach.status === 'suggest' || coach.status === 'goal-reached') && coach.suggested != null
+  const { due: isDue, daysToNext } = checkInStatus(userState.lastCheckIn, todayKey, coach.status)
+  const newTarget = coach.suggested ?? calorieTarget
+  const hasChanges = newTarget !== calorieTarget
+
+  function recordCheckIn() {
+    dispatch({ type: 'recordCheckIn', key: todayKey })
+  }
 
   // History: archived entries + a canned pre-seed phase so the list feels lived-in
   const history = useMemo(() => {
@@ -134,17 +139,28 @@ export default function GoalPage({ onClose }) {
   }
 
   function acceptUpdate() {
-    dispatch({ type: 'setCalorieTarget', target: coach.suggested })
-    toast(`Program updated — ${coach.suggested.toLocaleString()} kcal/day`)
+    if (hasChanges) dispatch({ type: 'setCalorieTarget', target: newTarget })
+    recordCheckIn()
+    toast(
+      hasChanges
+        ? `Program updated — ${newTarget.toLocaleString()} kcal/day`
+        : 'Checked in — plan holds',
+    )
+    setView('main')
+  }
+
+  function declineUpdate() {
+    recordCheckIn()
+    toast('Silenced until next week')
     setView('main')
   }
 
   // ── Program Update view ──────────────────────────────────────────────
-  if (view === 'update' && hasSuggestion) {
+  if (view === 'update' && isDue) {
     const oldT = macroTargets(calorieTarget)
-    const newT = macroTargets(coach.suggested)
+    const newT = macroTargets(newTarget)
     const changes = [
-      ['🔥', 'Calories', coach.suggested - calorieTarget, 'kcal'],
+      ['🔥', 'Calories', newTarget - calorieTarget, 'kcal'],
       ['P', 'Protein', newT.protein - oldT.protein, 'g'],
       ['F', 'Fat', newT.fat - oldT.fat, 'g'],
       ['C', 'Carbs', newT.carbs - oldT.carbs, 'g'],
@@ -166,8 +182,13 @@ export default function GoalPage({ onClose }) {
             <p className="mb-4 text-center text-[15px] font-semibold text-ink">
               Next week's plan
             </p>
-            <MacroColumns kcal={coach.suggested} />
+            <MacroColumns kcal={newTarget} />
           </Card>
+          {!hasChanges && (
+            <p className="mt-3 text-center text-[13px] text-ink-2">
+              You're on plan — no changes needed this week.
+            </p>
+          )}
           <SectionTitle>What changed</SectionTitle>
           <Card className="!p-2">
             {changes.map(([icon, label, delta, unit]) => (
@@ -199,14 +220,16 @@ export default function GoalPage({ onClose }) {
             onClick={acceptUpdate}
             className="w-full rounded-xl bg-white py-3.5 text-[15px] font-semibold text-black active:scale-[0.98] transition-transform"
           >
-            Accept program changes
+            {hasChanges ? 'Accept program changes' : 'Confirm check-in'}
           </button>
-          <button
-            onClick={() => setView('main')}
-            className="w-full rounded-xl bg-surface-2 py-3 text-[14px] font-medium text-ink-2"
-          >
-            Not now
-          </button>
+          {hasChanges && (
+            <button
+              onClick={declineUpdate}
+              className="w-full rounded-xl bg-surface-2 py-3 text-[14px] font-medium text-ink-2"
+            >
+              Decline and silence
+            </button>
+          )}
         </div>
         <Sheet open={whySheet} onClose={() => setWhySheet(false)} title="How this was computed">
           <div className="flex flex-col gap-2">
@@ -286,19 +309,23 @@ export default function GoalPage({ onClose }) {
           </div>
         </Card>
 
-        {/* Check-in */}
+        {/* Check-in — unlocks weekly */}
         <div className="my-7 flex justify-center">
           <button
-            onClick={() => hasSuggestion && setView('update')}
+            onClick={() => isDue && setView('update')}
             className={`flex h-44 w-44 flex-col items-center justify-center rounded-full transition-transform active:scale-95 ${
-              hasSuggestion ? 'bg-white shadow-xl shadow-white/10' : 'bg-surface'
+              isDue ? 'bg-white shadow-xl shadow-white/10' : 'bg-surface'
             }`}
           >
-            <span className={`text-[22px] font-extrabold tracking-tight ${hasSuggestion ? 'text-black' : 'text-ink-3'}`}>
+            <span className={`text-[22px] font-extrabold tracking-tight ${isDue ? 'text-black' : 'text-ink-3'}`}>
               CHECK IN
             </span>
-            <span className={`text-[13px] ${hasSuggestion ? 'text-black/60' : 'text-ink-3'}`}>
-              {hasSuggestion ? "it's time" : 'on plan'}
+            <span className={`text-[13px] ${isDue ? 'text-black/60' : 'text-ink-3'}`}>
+              {isDue
+                ? "it's time"
+                : coach.status === 'collecting'
+                  ? 'gathering data'
+                  : `in ${daysToNext}d`}
             </span>
           </button>
         </div>

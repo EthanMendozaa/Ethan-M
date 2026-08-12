@@ -17,7 +17,7 @@ import {
   macroTargets,
   weightJourney,
 } from '../lib/derived'
-import { calorieCoach, REFERENCES } from '../lib/engine'
+import { calorieCoach, checkInStatus, REFERENCES } from '../lib/engine'
 import { Card, Chip, SectionTitle, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
 import Sparkline from '../components/Sparkline'
@@ -63,6 +63,7 @@ export default function Nutrition({ onOpenWeight, onAddFood, onOpenGoal }) {
     () => calorieCoach(days, calorieTarget, goal),
     [days, calorieTarget, goal],
   )
+  const checkIn = checkInStatus(userState.lastCheckIn, todayKey, coach.status)
   const targets = useMemo(() => macroTargets(calorieTarget), [calorieTarget])
   const tdee = useMemo(() => tdeeAt(days, days.length - 1), [days])
 
@@ -162,8 +163,9 @@ export default function Nutrition({ onOpenWeight, onAddFood, onOpenGoal }) {
       >
         Calorie coach
       </SectionTitle>
-      {coach.status === 'suggest' || coach.status === 'goal-reached' ? (
+      {checkIn.due ? (
         <Card
+          onClick={onOpenGoal}
           className={
             coach.status === 'goal-reached'
               ? 'border border-good/30'
@@ -172,39 +174,31 @@ export default function Nutrition({ onOpenWeight, onAddFood, onOpenGoal }) {
         >
           <div className="flex items-center justify-between">
             <Chip tone={coach.status === 'goal-reached' ? 'good' : 'accent'}>
-              {coach.status === 'goal-reached' ? '🎉 Goal reached' : 'Suggested update'}
+              {coach.status === 'goal-reached' ? '🎉 Goal reached' : 'Weekly check-in ready'}
             </Chip>
-            <button onClick={() => setSheet('coach')} className="text-[12px] font-medium text-series-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setSheet('coach')
+              }}
+              className="text-[12px] font-medium text-series-1"
+            >
               Why?
             </button>
           </div>
-          <div className="mt-3 flex items-center gap-3">
-            <p className="text-[24px] font-bold text-ink-2 line-through decoration-ink-3/60">
-              {calorieTarget.toLocaleString()}
-            </p>
-            <span className="text-ink-3">→</span>
-            <p className="text-[24px] font-bold text-ink">{coach.suggested.toLocaleString()}</p>
-            <Chip tone={coach.delta > 0 ? 'good' : 'warning'}>
-              {coach.delta > 0 ? '+' : ''}
-              {coach.delta} kcal
-            </Chip>
-          </div>
-          <p className="mt-1.5 text-[12px] text-ink-3">
+          <p className="mt-2 text-[13px] text-ink-2">
             {coach.observedRate} lb/wk vs {coach.targetRate} target
+            {coach.suggested !== calorieTarget &&
+              ` → proposing ${coach.suggested.toLocaleString()} kcal`}
           </p>
-          {coach.dietBreak && (
-            <p className="mt-2 rounded-lg bg-warning/10 px-3 py-2 text-[12px] text-warning">
-              Or: diet-break week at ~{coach.dietBreak.toLocaleString()} kcal
-            </p>
-          )}
           <button
-            onClick={() => {
-              dispatch({ type: 'setCalorieTarget', target: coach.suggested })
-              toast(`Target updated to ${coach.suggested.toLocaleString()} kcal`)
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenGoal()
             }}
             className="mt-3 w-full rounded-xl bg-series-1 py-3 text-[14px] font-semibold text-white active:scale-[0.98] transition-transform"
           >
-            Apply {coach.suggested.toLocaleString()} kcal
+            Review program update →
           </button>
         </Card>
       ) : (
@@ -212,7 +206,7 @@ export default function Nutrition({ onOpenWeight, onAddFood, onOpenGoal }) {
           <span className="text-[13px] text-ink-2">
             {coach.status === 'collecting'
               ? `Need ${coach.needed} more weigh-ins to calibrate`
-              : `On plan — ${calorieTarget.toLocaleString()} kcal holds`}
+              : `On plan — ${calorieTarget.toLocaleString()} kcal · next check-in in ${checkIn.daysToNext}d`}
           </span>
           {coach.status !== 'collecting' && (
             <button onClick={() => setSheet('coach')} className="text-[12px] font-medium text-series-1">
