@@ -49,7 +49,7 @@ export default function App() {
             {tab === 'train' && (
               <Train autoStart={pendingWorkout} onAutoStarted={() => setPendingWorkout(false)} />
             )}
-            {tab === 'stats' && <Stats />}
+            {tab === 'stats' && <Stats onOpenWeight={openWeight} />}
             {tab === 'profile' && <Profile onNavigate={setTab} />}
           </main>
           <TabBar active={tab} onChange={setTab} onPlus={() => setQuickOpen(true)} />
