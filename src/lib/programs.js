@@ -14,18 +14,20 @@ export const MUSCLE_GROUPS = [
   'Abs',
 ]
 
-// Weekly set targets per muscle group (MEV–MRV band for the volume chart).
+// Weekly hard-set targets per muscle group. Low-volume / high-intensity
+// posture: a handful of sets taken close to failure beats accumulating
+// half-effort volume (Androulakis-Korakakis 2020; Iversen 2021).
 export const VOLUME_BAND = {
-  Chest: [10, 20],
-  Back: [10, 22],
-  Shoulders: [8, 20],
-  Biceps: [8, 18],
-  Triceps: [8, 18],
-  Quads: [8, 18],
-  Hamstrings: [6, 16],
-  Glutes: [6, 16],
-  Calves: [6, 14],
-  Abs: [4, 12],
+  Chest: [5, 12],
+  Back: [6, 14],
+  Shoulders: [4, 10],
+  Biceps: [3, 8],
+  Triceps: [3, 8],
+  Quads: [4, 10],
+  Hamstrings: [3, 8],
+  Glutes: [3, 8],
+  Calves: [3, 8],
+  Abs: [3, 8],
 }
 
 // Exercise database: ~60 movements across every group. `defaultLoad` seeds a

@@ -14,7 +14,7 @@ import {
   e1rmSeries,
 } from '../lib/derived'
 import { PROGRAMS, EXERCISES, MUSCLE_GROUPS } from '../lib/programs'
-import { dayReadiness, prescribeExercise } from '../lib/engine'
+import { dayReadiness, prescribeExercise, setCapFor } from '../lib/engine'
 import { weekday, shortDate } from '../lib/dates'
 import { Card, Chip, SectionTitle, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
@@ -68,9 +68,9 @@ function buildLoggerState(plannedSession, ready, days) {
     const target = prescribeExercise(days, ex.name, ex.targetReps, dayRx)
     const inc = ex.increment || 2.5
     const sets = []
-    let n = ex.targetSets
+    // HIT posture: top set + 1-2 back-offs, never more
+    let n = Math.min(ex.targetSets, setCapFor(ex.name))
     if (cut) n = Math.max(1, Math.round(n * 0.8))
-    if (ready.bonusSet && idx === 0) n += 1
     for (let s = 0; s < n; s++) {
       const ghost = ex.prevSets?.[s]
       sets.push({
@@ -81,9 +81,8 @@ function buildLoggerState(plannedSession, ready, days) {
           s === 0
             ? target.load
             : (ghost?.load ?? Math.max(0, Math.round((target.load * (1 - 0.04 * s)) / inc) * inc)),
-        rir: ghost?.rir ?? 2,
+        rir: s === 0 ? target.rir : (ghost?.rir ?? 1),
         done: false,
-        bonus: ready.bonusSet && idx === 0 && s === n - 1,
       })
     }
     return {

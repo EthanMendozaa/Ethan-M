@@ -260,7 +260,7 @@ export function plannedSessionFor(world, key) {
         name: ex.name,
         muscles: meta.muscles,
         superset: ex.superset ?? null,
-        targetSets: ex.sets + 1 * (idx < 3 ? 1 : 0), // block-2 volume
+        targetSets: ex.sets,
         targetReps: ex.reps,
         prevSets: prev ? prev.sets : null,
         increment: meta.increment,

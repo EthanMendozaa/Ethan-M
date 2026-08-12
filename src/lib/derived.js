@@ -259,10 +259,9 @@ export function readiness(days, plannedSplit) {
       recovery: rec,
       tone: 'high',
       title: `Recovery ${rec} — green light for ${plannedSplit}`,
-      detail: 'Optional +1 set on your first lift.',
+      detail: 'Take your top sets to RIR 0.',
       hrvDeltaPct,
       volumeAdjustment: 0,
-      bonusSet: true,
     }
   }
   return {

@@ -16,6 +16,28 @@ Design principles:
 3. **One signal, one job.** Each input adjusts one thing (load expectation,
    progression permission, or volume) so effects don't silently compound.
 
+## 0. Training philosophy: low volume, high intensity
+
+The engine's posture is a small number of hard sets, taken to (or very
+near) failure, with full recovery between them — progression through load,
+not through accumulating volume:
+
+- A **minimum effective dose** of heavy, high-effort sets maintains and
+  builds 1RM strength in trained lifters (Androulakis-Korakakis 2020);
+  low-volume/high-intensity programs matched or beat high-volume programs
+  for strength in trained men (Mangine 2015); time-efficient low-set
+  designs retain most of the stimulus (Iversen 2021).
+- **Proximity to failure drives hypertrophy** — closer is better, which is
+  what makes low set counts viable (Refalo 2023). The engine's working
+  range is RIR 0-2, and a set left at RIR ≥2 is treated as "too easy" and
+  triggers a load increase.
+- Concretely: **compounds are capped at 3 hard sets, isolation at 2**; a
+  high-readiness day earns a top set at RIR 0 — never extra sets; rest is
+  long (3 min compounds / 2 min isolation — Schoenfeld 2016, longer rests
+  outperform short ones when sets are hard); and the weekly volume bands
+  are set low (3-14 sets per muscle) with an advisor that flags volume
+  *above* the band, not just below it.
+
 ---
 
 ## 1. Estimating strength: e1RM
@@ -42,10 +64,13 @@ session and applies, in order:
 
 | Last top set | Prescription | Basis |
 |---|---|---|
-| RIR ≥ 3 | load +~2.5% (min one plate step) | RPE-based prescription tracks true intensity well (Helms 2018) |
+| RIR ≥ 2 | load +~2.5% (min one plate step) — the set was too easy | work belongs near failure (Refalo 2023; Helms 2018) |
 | Target reps hit at RIR ≥ 1 | load +1 plate step | ACSM (2009): increase 2-10% once target reps are exceeded |
-| Missed target by ≥2 reps, or RIR 0 | hold load, consolidate | Avoid progressing off a grinder (ACSM 2009) |
+| Missed target by ≥2 reps at RIR 0 | hold load, consolidate | avoid progressing off a true grinder (ACSM 2009) |
 | Otherwise | same load, +1 rep | classic double progression |
+
+Target RIR is 1 on a normal day and **0 on a high-readiness day** — extra
+recovery is spent on intensity, never on extra sets.
 
 Plate steps use each exercise's real-world increment (2.5 / 5 / 10 lb), so a
 prescription is always loadable.
@@ -93,10 +118,14 @@ readiness gate all read this one model.
 
 ## 5. Volume targets
 
-Weekly per-muscle set targets (the MEV-MRV band on the volume screen,
-10-20 sets for most groups) follow the hypertrophy dose-response literature:
-clear benefits up to ~10 weekly sets and further, diminishing returns in
-the 12-20 range (Schoenfeld 2017; Baz-Valle 2022).
+Weekly per-muscle bands are deliberately low (3-8 sets for smaller groups,
+up to 5-14 for chest/back), reflecting the minimum-effective-dose evidence
+(Androulakis-Korakakis 2020; Iversen 2021) rather than the volume-
+maximizing end of the dose-response curve (Schoenfeld 2017). The engine's
+volume advisor flags weeks that land **above** the band — the failure mode
+this philosophy cares about is junk volume, not missed volume. A dedicated
+deload trigger fires when main-lift e1RMs stall across two weeks while HRV
+sits below its band (overtraining consensus: Meeusen 2013).
 
 ## 6. Energy expenditure (TDEE)
 
@@ -130,6 +159,7 @@ TDEE = mean(intake, 14d) − Δ(trendWeight, 14d)/day × 3500
 ## References
 
 - ACSM (2009). *Progression models in resistance training for healthy adults.* Med Sci Sports Exerc 41(3).
+- Androulakis-Korakakis P et al. (2020). *The minimum effective training dose required to increase 1RM strength in resistance-trained men.* Sports Med 50(4).
 - Baz-Valle E et al. (2022). *A systematic review of the effects of different resistance training volumes on muscle hypertrophy.* J Hum Kinet 81.
 - Craven J et al. (2022). *Effects of acute sleep loss on physical performance: a systematic and meta-analytical review.* Sports Med 52.
 - Damas F et al. (2016). *Resistance training-induced changes in integrated myofibrillar protein synthesis.* J Physiol 594(18).
@@ -140,7 +170,12 @@ TDEE = mean(intake, 14d) − Δ(trendWeight, 14d)/day × 3500
 - Helms ER et al. (2018). *Self-rated accuracy of RPE-based load prescription in powerlifters.* J Strength Cond Res 32(10).
 - Kiviniemi AM et al. (2007). *Endurance training guided individually by daily heart rate variability measurements.* Eur J Appl Physiol 101(6).
 - Knowles OE et al. (2018). *Inadequate sleep and muscle strength: implications for resistance training.* J Sci Med Sport 21(9).
+- Iversen VM et al. (2021). *No time to lift? Designing time-efficient training programs.* Sports Med 51(10).
+- Mangine GT et al. (2015). *The effect of training volume and intensity on improvements in muscular strength and size in resistance-trained men.* Physiol Rep 3(8).
+- Meeusen R et al. (2013). *Prevention, diagnosis and treatment of the overtraining syndrome — ECSS/ACSM consensus statement.* Med Sci Sports Exerc 45(1).
 - Murphy C, Koehler K (2022). *Energy deficiency impairs resistance training gains in lean mass but not strength.* Scand J Med Sci Sports 32(1).
+- Refalo MC et al. (2023). *Influence of resistance training proximity-to-failure on skeletal muscle hypertrophy: a systematic review with meta-analysis.* Sports Med 53(3).
+- Schoenfeld BJ et al. (2016). *Longer interset rest periods enhance muscle strength and hypertrophy in resistance-trained men.* J Strength Cond Res 30(7).
 - Plews DJ et al. (2013). *Training adaptation and heart rate variability in elite endurance athletes.* Sports Med 43(9).
 - Schoenfeld BJ et al. (2017). *Dose-response relationship between weekly resistance training volume and muscle hypertrophy.* J Sports Sci 35(11).
 - Vesterinen V et al. (2016). *Individual endurance training prescription with heart rate variability.* Med Sci Sports Exerc 48(7).

@@ -9,8 +9,12 @@
 // always produce the same prescription and the same explanation.
 // ─────────────────────────────────────────────────────────────────────────
 
-import { tdeeAt, muscleRecoveryState } from './derived'
-import { EXERCISES } from './programs'
+// Training philosophy: LOW VOLUME, HIGH INTENSITY. A few hard sets taken
+// close to failure, full recovery between them, progression through load —
+// not through accumulating half-effort volume.
+
+import { tdeeAt, muscleRecoveryState, weeklyVolume, e1rmSeries } from './derived'
+import { EXERCISES, VOLUME_BAND, MAIN_LIFTS } from './programs'
 
 export const REFERENCES = {
   epley1985: 'Epley B (1985). Poundage chart. Boyd Epley Workout.',
@@ -36,6 +40,32 @@ export const REFERENCES = {
     'Damas F et al. (2016). Resistance training-induced changes in integrated myofibrillar protein synthesis. J Physiol 594(18).',
   schoenfeld2017:
     'Schoenfeld BJ et al. (2017). Dose-response relationship between weekly resistance training volume and hypertrophy. J Sports Sci 35(11).',
+  androulakis2020:
+    'Androulakis-Korakakis P et al. (2020). The minimum effective training dose required to increase 1RM strength in resistance-trained men. Sports Med 50(4).',
+  mangine2015:
+    'Mangine GT et al. (2015). The effect of training volume and intensity on improvements in muscular strength and size in resistance-trained men. Physiol Rep 3(8).',
+  refalo2023:
+    'Refalo MC et al. (2023). Influence of resistance training proximity-to-failure on skeletal muscle hypertrophy: a systematic review with meta-analysis. Sports Med 53(3).',
+  iversen2021:
+    'Iversen VM et al. (2021). No time to lift? Designing time-efficient training programs. Sports Med 51(10).',
+  schoenfeld2016rest:
+    'Schoenfeld BJ et al. (2016). Longer interset rest periods enhance muscle strength and hypertrophy in resistance-trained men. J Strength Cond Res 30(7).',
+  meeusen2013:
+    'Meeusen R et al. (2013). Prevention, diagnosis and treatment of the overtraining syndrome — ECSS/ACSM consensus statement. Med Sci Sports Exerc 45(1).',
+}
+
+// Rest between hard sets: longer rest preserves output on the next set
+// (Schoenfeld 2016). Compounds get 3 min, isolation 2 min.
+export function restSecondsFor(exName) {
+  const meta = EXERCISES[exName]
+  return meta?.main || meta?.equipment === 'barbell' ? 180 : 120
+}
+
+// Hard-set cap per exercise: top set + 1-2 back-offs. More than that is
+// volume the philosophy says you don't need (Androulakis-Korakakis 2020).
+export function setCapFor(exName) {
+  const meta = EXERCISES[exName]
+  return meta?.main || meta?.equipment === 'barbell' ? 3 : 2
 }
 
 // ── e1RM ──────────────────────────────────────────────────────────────────
@@ -149,18 +179,52 @@ export function dayReadiness(days, muscles = []) {
     } else {
       rationale.push({ text: `Target muscles recovered (48-72h decay complete)`, ref: 'damas2016' })
     }
+
+    // Volume advisor: above the effective band → trim sets, keep effort
+    const vol = weeklyVolume(days)
+    const over = muscles.filter((m) => {
+      const v = vol.find((x) => x.muscle === m)
+      return v && v.sets > (VOLUME_BAND[m]?.[1] ?? 99)
+    })
+    if (over.length) {
+      rationale.push({
+        text: `${over.join(', ')} above the effective band last week — fewer sets, harder sets`,
+        ref: 'androulakis2020',
+      })
+    }
+  }
+
+  // Deload check: main-lift e1RM flat-or-down while HRV sits below band
+  if (hrv?.state === 'low') {
+    const series = e1rmSeries(days)
+    const stalled = MAIN_LIFTS.filter((l) => {
+      const pts = series[l]
+      if (pts.length < 6) return false
+      const recent = pts.slice(-3).reduce((s, p) => s + p.e1rm, 0) / 3
+      const prior = pts.slice(-6, -3).reduce((s, p) => s + p.e1rm, 0) / 3
+      return recent <= prior
+    })
+    if (stalled.length >= 3) {
+      level = 'back-off'
+      rationale.push({
+        text: 'Lifts stalling with HRV suppressed — take a lighter week',
+        ref: 'meeusen2013',
+      })
+    }
   }
 
   return { level, loadPct: Math.max(-0.06, loadPct), rationale }
 }
 
 // ── Per-exercise prescription ────────────────────────────────────────────
-// Double progression autoregulated by RIR (ACSM 2009; Helms 2018):
-//   · last top set left ≥3 RIR            → load up ~2.5-5%
+// High-intensity double progression (ACSM 2009; Helms 2018; Refalo 2023):
+// work lives at RIR 0-2, and progression comes through load.
+//   · last top set left ≥2 RIR            → load up ~2.5% (too easy)
 //   · hit target reps at RIR ≥1           → load up one plate step
-//   · missed reps by 2+ or hit RIR 0      → hold and consolidate
+//   · missed reps by 2+ at RIR 0          → hold and consolidate
 //   · otherwise                           → same load, chase +1 rep
-// The day-readiness modifier then scales or vetoes the increase.
+// The day-readiness modifier then scales or vetoes the increase; a
+// high-readiness day means take the top set to RIR 0, not more sets.
 export function prescribeExercise(days, exName, targetReps, day) {
   const meta = EXERCISES[exName]
   const inc = meta?.increment || 2.5
@@ -174,7 +238,7 @@ export function prescribeExercise(days, exName, targetReps, day) {
     return {
       load: meta?.defaultLoad ?? 0,
       reps: targetReps,
-      rir: 2,
+      rir: 1,
       change: 'first log',
       rationale: [{ text: 'No history yet — starting from the library default', ref: 'acsm2009' }],
     }
@@ -191,22 +255,26 @@ export function prescribeExercise(days, exName, targetReps, day) {
   let load = top.load
   let reps = targetReps
   let change = 'hold'
-  if (top.rir >= 3) {
+  const targetRir = day?.level === 'push' ? 0 : 1
+  if (top.rir >= 2) {
     const step = Math.max(inc, Math.round((top.load * 0.025) / inc) * inc)
     load = top.load + step
     change = `+${step} lb`
-    rationale.push({ text: `≥3 reps in reserve — load up ~2.5%`, ref: 'helms2018' })
+    rationale.push({ text: `${top.rir} reps left in the tank — that set was too easy. Load up ~2.5%`, ref: 'refalo2023' })
   } else if (top.reps >= targetReps && top.rir >= 1) {
     load = top.load + inc
     change = `+${inc} lb`
-    rationale.push({ text: `Hit ${targetReps} reps with reserve — progress one step`, ref: 'acsm2009' })
-  } else if (top.reps <= targetReps - 2 || top.rir === 0) {
+    rationale.push({ text: `Hit ${targetReps} reps near failure — progress one step`, ref: 'acsm2009' })
+  } else if (top.reps <= targetReps - 2 && top.rir === 0) {
     change = 'hold'
-    rationale.push({ text: `Ground out last time — consolidate before adding load`, ref: 'acsm2009' })
+    rationale.push({ text: `True failure short of target — consolidate before adding load`, ref: 'acsm2009' })
   } else {
     change = '+1 rep'
     reps = top.reps + 1
-    rationale.push({ text: `Same load, chase one more rep`, ref: 'acsm2009' })
+    rationale.push({ text: `Same load, one more rep at the same effort`, ref: 'acsm2009' })
+  }
+  if (day?.level === 'push') {
+    rationale.push({ text: 'Recovery above band — take the top set to RIR 0', ref: 'refalo2023' })
   }
 
   // Readiness veto/scale
@@ -228,7 +296,7 @@ export function prescribeExercise(days, exName, targetReps, day) {
     }
   }
 
-  return { load, reps, rir: 2, change, e1rm, rationale }
+  return { load, reps, rir: targetRir, change, e1rm, rationale }
 }
 
 function fmtH(hours) {

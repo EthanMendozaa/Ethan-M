@@ -7,7 +7,7 @@ import { Chip, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
 import PlateCalculator from '../components/PlateCalculator'
 import { alternativesFor } from '../lib/programs'
-import { REFERENCES } from '../lib/engine'
+import { REFERENCES, restSecondsFor } from '../lib/engine'
 
 function roundTo(load, inc) {
   const step = inc || 2.5
@@ -42,7 +42,6 @@ function Stepper({ value, onChange, step = 1, wide }) {
   )
 }
 
-const REST_SECONDS = 90
 
 export default function ActiveWorkout({
   logger,
@@ -95,7 +94,11 @@ export default function ActiveWorkout({
           : { ...ex, sets: ex.sets.map((s, j) => (j !== setIdx ? s : { ...s, done: !s.done })) },
       ),
     )
-    if (!wasDone) setRest({ until: Date.now() + REST_SECONDS * 1000, total: REST_SECONDS })
+    if (!wasDone) {
+      // Full recovery between hard sets: 3 min compounds, 2 min isolation
+      const secs = restSecondsFor(logger[exIdx].name)
+      setRest({ until: Date.now() + secs * 1000, total: secs })
+    }
   }
 
   function addSet(exIdx, drop = false) {
