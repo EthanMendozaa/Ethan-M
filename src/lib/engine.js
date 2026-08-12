@@ -15,17 +15,23 @@
 
 import { tdeeAt, muscleRecoveryState, weeklyVolume, e1rmSeries, trendWeightSeries } from './derived'
 import { EXERCISES, VOLUME_BAND, MAIN_LIFTS } from './programs'
-import { keyToDate, DAY_MS } from './dates'
+import { keyToDate, toKey } from './dates'
 
-// Weekly check-in cadence: unlocks 7 days after the last accepted/declined
-// check-in; a reached goal unlocks immediately.
-export function checkInStatus(lastCheckIn, todayKey, coachStatus) {
-  const daysToNext = lastCheckIn
-    ? Math.max(0, 7 - Math.round((keyToDate(todayKey) - keyToDate(lastCheckIn)) / DAY_MS))
-    : 0
+// Check-ins happen once a week on a CHOSEN weekday. The check-in for a
+// given week is "due" from that weekday until it is accepted or declined;
+// extra weigh-ins on any other day add data but never trigger an update.
+// A reached goal unlocks a check-in immediately.
+export function checkInStatus(lastCheckIn, todayKey, coachStatus, checkInDay = 1) {
+  const today = keyToDate(todayKey)
+  const sinceScheduled = (today.getDay() - checkInDay + 7) % 7
+  const scheduled = new Date(today)
+  scheduled.setDate(today.getDate() - sinceScheduled)
+  const scheduledKey = toKey(scheduled)
+  const resolved = lastCheckIn != null && lastCheckIn >= scheduledKey
   const due =
-    coachStatus !== 'collecting' && (daysToNext === 0 || coachStatus === 'goal-reached')
-  return { due, daysToNext }
+    coachStatus !== 'collecting' && (!resolved || coachStatus === 'goal-reached')
+  const daysToNext = due ? 0 : (checkInDay - today.getDay() + 7) % 7 || 7
+  return { due, daysToNext, scheduledKey }
 }
 
 export const REFERENCES = {

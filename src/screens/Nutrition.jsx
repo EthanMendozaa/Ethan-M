@@ -63,7 +63,12 @@ export default function Nutrition({ onOpenWeight, onAddFood, onOpenGoal }) {
     () => calorieCoach(days, calorieTarget, goal),
     [days, calorieTarget, goal],
   )
-  const checkIn = checkInStatus(userState.lastCheckIn, todayKey, coach.status)
+  const checkIn = checkInStatus(
+    userState.lastCheckIn,
+    todayKey,
+    coach.status,
+    userState.checkInDay ?? 1,
+  )
   const targets = useMemo(() => macroTargets(calorieTarget), [calorieTarget])
   const tdee = useMemo(() => tdeeAt(days, days.length - 1), [days])
 

@@ -5,8 +5,10 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '../lib/store'
 import { shortDate, addDays } from '../lib/dates'
-import { trendWeightSeries, macroTargets } from '../lib/derived'
-import { calorieCoach, checkInStatus, REFERENCES } from '../lib/engine'
+import { trendWeightSeries, macroTargets, weeklyVolume } from '../lib/derived'
+import { calorieCoach, checkInStatus, dayReadiness, REFERENCES } from '../lib/engine'
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 import { Card, Chip, SectionTitle, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
 
@@ -62,6 +64,8 @@ export default function GoalPage({ onClose }) {
   const [view, setView] = useState('main') // main | update
   const [editor, setEditor] = useState(null) // { isNew, draft }
   const [whySheet, setWhySheet] = useState(false)
+  const [daySheet, setDaySheet] = useState(false)
+  const [weighInput, setWeighInput] = useState('')
 
   const goal = userState.goal ?? { phase: 'cut', goalWeight: 145, weeklyRateLb: -0.96 }
   const calorieTarget = userState.calorieTarget ?? 2050
@@ -72,9 +76,34 @@ export default function GoalPage({ onClose }) {
   const startKey = goal.startKey ?? days[0].key
   const ratePct = bw ? Math.round((Math.abs(goal.weeklyRateLb) / bw) * 1000) / 10 : 0
 
-  const { due: isDue, daysToNext } = checkInStatus(userState.lastCheckIn, todayKey, coach.status)
+  const checkInDay = userState.checkInDay ?? 1
+  const { due: isDue, daysToNext } = checkInStatus(
+    userState.lastCheckIn,
+    todayKey,
+    coach.status,
+    checkInDay,
+  )
   const newTarget = coach.suggested ?? calorieTarget
   const hasChanges = newTarget !== calorieTarget
+  const today = days[days.length - 1]
+  const needsWeighIn = today.weightLb == null
+
+  // Workout-plan side of the check-in: deload beats volume trim beats hold
+  const training = useMemo(() => {
+    const rx = dayReadiness(days, [])
+    if (rx.rationale.some((r) => r.ref === 'meeusen2013')) {
+      return { change: true, text: 'Deload week — lighter loads, stop at RIR 3', ref: 'meeusen2013' }
+    }
+    const over = weeklyVolume(days).filter((v) => v.sets > v.mrv)
+    if (over.length) {
+      return {
+        change: true,
+        text: `Trim ${over.map((v) => v.muscle).join(', ')} — above the effective band`,
+        ref: 'androulakis2020',
+      }
+    }
+    return { change: false, text: 'No change — progression continues', ref: 'acsm2009' }
+  }, [days])
 
   function recordCheckIn() {
     dispatch({ type: 'recordCheckIn', key: todayKey })
@@ -155,7 +184,56 @@ export default function GoalPage({ onClose }) {
     setView('main')
   }
 
-  // ── Program Update view ──────────────────────────────────────────────
+  // ── Check-in step 1: weigh in first ─────────────────────────────────
+  if (view === 'update' && isDue && needsWeighIn) {
+    return (
+      <div className="absolute inset-0 z-20 flex flex-col bg-page">
+        <header className="flex items-center justify-between px-5 pb-3 pt-14">
+          <button onClick={() => setView('main')} className="flex items-center gap-1 text-[14px] text-ink-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M14.5 5 8 12l6.5 7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Back
+          </button>
+          <p className="text-[16px] font-bold text-ink">Check-in</p>
+          <span className="w-14" />
+        </header>
+        <div className="flex flex-1 flex-col justify-center px-6 pb-24">
+          <p className="text-center text-[13px] font-semibold uppercase tracking-wider text-ink-3">
+            Step 1 of 2
+          </p>
+          <h2 className="mt-2 text-center text-[24px] font-bold text-ink">Weigh in</h2>
+          <p className="mt-1 text-center text-[13px] text-ink-3">
+            Trend {bw?.toFixed(1)} lb — today's reading finishes the week's data
+          </p>
+          <div className="mt-6 flex gap-2">
+            <input
+              inputMode="decimal"
+              autoFocus
+              placeholder={bw?.toFixed(1)}
+              value={weighInput}
+              onChange={(e) => setWeighInput(e.target.value)}
+              className="w-28 rounded-xl bg-surface-2 px-3 py-3 text-[17px] font-semibold text-ink outline-none placeholder:text-ink-3"
+            />
+            <button
+              onClick={() => {
+                const w = parseFloat(weighInput)
+                if (!w || w < 80 || w > 400) return
+                dispatch({ type: 'addWeighIn', key: todayKey, weightLb: Math.round(w * 10) / 10 })
+                setWeighInput('')
+                toast('Weigh-in logged — computing your update')
+              }}
+              className="flex-1 rounded-xl bg-series-1 py-3 text-[15px] font-semibold text-white"
+            >
+              Save & continue
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Program Update view (step 2) ─────────────────────────────────────
   if (view === 'update' && isDue) {
     const oldT = macroTargets(calorieTarget)
     const newT = macroTargets(newTarget)
@@ -207,6 +285,21 @@ export default function GoalPage({ onClose }) {
                 </span>
               </div>
             ))}
+          </Card>
+
+          <SectionTitle>Workout plan</SectionTitle>
+          <Card className="flex items-center gap-3 !px-4 !py-3.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[15px]">
+              🏋️
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className={`text-[13px] leading-snug ${training.change ? 'font-semibold text-ink' : 'text-ink-2'}`}>
+                {training.text}
+              </p>
+              {training.change && (
+                <p className="mt-0.5 text-[11px] text-ink-3">applies to your next session automatically</p>
+              )}
+            </div>
           </Card>
           <p className="mt-3 px-1 text-[12px] leading-snug text-ink-3">
             {coach.observedRate} lb/wk vs {coach.targetRate} target ·{' '}
@@ -325,9 +418,20 @@ export default function GoalPage({ onClose }) {
                 ? "it's time"
                 : coach.status === 'collecting'
                   ? 'gathering data'
-                  : `in ${daysToNext}d`}
+                  : `${WEEKDAYS[checkInDay].slice(0, 3)} · in ${daysToNext}d`}
             </span>
           </button>
+        </div>
+        <div className="-mt-3 mb-6 flex flex-col items-center gap-1.5">
+          <button
+            onClick={() => setDaySheet(true)}
+            className="rounded-full bg-surface px-3 py-1.5 text-[11px] font-medium text-ink-2"
+          >
+            Check-in day · {WEEKDAYS[checkInDay]} ›
+          </button>
+          <p className="text-[11px] text-ink-3">
+            Weigh in any day — more data, updates only at check-in
+          </p>
         </div>
 
         {/* Current program */}
@@ -365,6 +469,27 @@ export default function GoalPage({ onClose }) {
           ))}
         </div>
       </div>
+
+      {/* Check-in day picker */}
+      <Sheet open={daySheet} onClose={() => setDaySheet(false)} title="Check-in day">
+        <div className="flex flex-col gap-1.5">
+          {WEEKDAYS.map((name, i) => (
+            <button
+              key={name}
+              onClick={() => {
+                dispatch({ type: 'setCheckInDay', day: i })
+                setDaySheet(false)
+                toast(`Check-ins now land on ${name}s`)
+              }}
+              className={`rounded-xl px-4 py-3 text-left text-[14px] font-medium ${
+                checkInDay === i ? 'bg-series-1/15 text-ink ring-1 ring-series-1' : 'bg-surface-3 text-ink-2'
+              }`}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      </Sheet>
 
       {/* Goal editor */}
       <Sheet

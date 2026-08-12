@@ -172,12 +172,15 @@ Guardrails, in priority order:
    continuous for fat loss with better lean-mass outcomes in trained
    adults (Peos 2021).
 
-Suggestions run on a **weekly check-in cadence**: the coach recomputes
-continuously, but a program update is only offered once per 7 days
-(accepting *or* declining silences it until the next one; a reached goal
-unlocks immediately). Changes always require an explicit **Accept** — the
-engine never silently changes what the user is aiming at — and each
-update carries its rationale chain like every other engine output.
+Suggestions run on a **weekly check-in on a chosen weekday**: the coach
+recomputes continuously, but a program update is only offered on check-in
+day (and stays offered until accepted or declined; a reached goal unlocks
+immediately). The check-in itself starts with a weigh-in, then proposes
+either an update to the calorie *and* workout plan or "no change".
+Weigh-ins on any other day add data without triggering updates. Changes
+always require an explicit **Accept** — the engine never silently changes
+what the user is aiming at — and each update carries its rationale chain
+like every other engine output.
 
 ## Limitations (read before trusting it further)
 

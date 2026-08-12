@@ -19,6 +19,7 @@ const defaultUserState = {
   goal: { phase: 'cut', goalWeight: 145, weeklyRateLb: -0.96, startKey: null }, // the plan the coach steers toward
   goalHistory: [], // archived phases: { phase, startKey, endKey, startWeight, endWeight }
   lastCheckIn: null, // date key of the last accepted/declined weekly check-in
+  checkInDay: 1, // chosen weekday for check-ins (0 = Sunday … 6 = Saturday)
   activeProgramId: 'arnold-split',
   settings: { units: 'lb', notifications: true },
   onboarded: false,
@@ -149,6 +150,8 @@ function reducer(state, action) {
       return { ...state, calorieTarget: action.target }
     case 'recordCheckIn':
       return { ...state, lastCheckIn: action.key }
+    case 'setCheckInDay':
+      return { ...state, checkInDay: action.day }
     case 'setGoal':
       return {
         ...state,
