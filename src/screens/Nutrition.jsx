@@ -18,7 +18,7 @@ import {
   macroTargets,
   weightJourney,
 } from '../lib/derived'
-import { Card, Chip, SectionTitle } from '../components/ui'
+import { Card, Chip, SectionTitle, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
 import Sparkline from '../components/Sparkline'
 import { AXIS, GRID, ChartTooltip } from '../components/charts'
@@ -52,8 +52,10 @@ const SLOT_LABELS = {
 }
 
 export default function Nutrition({ onOpenWeight, onAddFood }) {
-  const { days, today } = useStore()
+  const { days, today, todayKey, dispatch } = useStore()
+  const toast = useToast()
   const [sheet, setSheet] = useState(null)
+  const [editItem, setEditItem] = useState(null) // { uid, name, base, mult, slot }
 
   const checkIn = useMemo(() => weeklyCheckIn(days), [days])
   const targets = useMemo(() => macroTargets(checkIn?.newTarget ?? 2050), [checkIn])
@@ -210,6 +212,30 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
       >
         Food log
       </SectionTitle>
+      {/* Persistent food search bar (opens the add-food flows) */}
+      <div className="mb-3 flex items-center gap-2">
+        <button
+          onClick={() => onAddFood('search')}
+          className="flex flex-1 items-center gap-2 rounded-full bg-surface px-4 py-2.5 text-[13px] text-ink-3"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="11" cy="11" r="7" strokeWidth="2" />
+            <path d="m20 20-3.5-3.5" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          Search for a food
+          <span className="ml-auto" onClick={(e) => { e.stopPropagation(); onAddFood('barcode') }}>
+            ║▌║
+          </span>
+        </button>
+        <button
+          onClick={() => onAddFood('describe')}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface text-[15px]"
+          aria-label="Describe food"
+        >
+          ✨
+        </button>
+      </div>
+
       <div className="flex flex-col gap-2">
         {today.meals.map((meal, i) => (
           <Card key={i} className="py-3">
@@ -217,11 +243,27 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
               <span className="text-[13px] font-semibold text-ink">{SLOT_LABELS[meal.slot]}</span>
               <span className="text-[11px] text-ink-3">{meal.time}</span>
             </div>
-            {meal.items.map((it, j) => (
-              <div key={j} className="mt-1.5 flex items-center justify-between text-[13px]">
-                <span className="text-ink-2">{it.name}</span>
-                <span className="text-ink-3">{it.kcal} kcal</span>
-              </div>
+            {meal.items.map((it) => (
+              <button
+                key={it.uid}
+                onClick={() => setEditItem({ ...it, slot: meal.slot })}
+                className="mt-1 flex w-full items-center justify-between rounded-lg px-1 py-1 text-left text-[13px] active:bg-surface-2"
+              >
+                <span className="text-ink-2">
+                  {it.name}
+                  {it.mult !== 1 && (
+                    <span className="ml-1.5 rounded bg-series-1/15 px-1 py-0.5 text-[10px] font-semibold text-series-1">
+                      ×{it.mult}
+                    </span>
+                  )}
+                </span>
+                <span className="flex items-center gap-1.5 text-ink-3">
+                  {it.kcal} kcal
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" opacity="0.6">
+                    <path d="M15 4l5 5L8 21H3v-5L15 4z" strokeWidth="2" strokeLinejoin="round" />
+                  </svg>
+                </span>
+              </button>
             ))}
             <div className="mt-2 border-t border-hairline pt-1.5 text-[11px] text-ink-3">
               {meal.kcal} kcal · P {meal.p} · C {meal.c} · F {meal.f}
@@ -229,6 +271,85 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
           </Card>
         ))}
       </div>
+
+      {/* Edit a logged item: portion, move, duplicate, remove */}
+      <Sheet open={editItem != null} onClose={() => setEditItem(null)} title={editItem?.name}>
+        {editItem && (
+          <div>
+            <p className="text-[12px] text-ink-3">
+              {Math.round(editItem.base.kcal * editItem.mult)} kcal · P{' '}
+              {Math.round(editItem.base.p * editItem.mult)} · C{' '}
+              {Math.round(editItem.base.c * editItem.mult)} · F{' '}
+              {Math.round(editItem.base.f * editItem.mult)}
+            </p>
+            <p className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wider text-ink-3">
+              Portion
+            </p>
+            <div className="flex gap-1.5">
+              {[0.5, 0.75, 1, 1.25, 1.5, 2].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => {
+                    dispatch({ type: 'editFood', key: todayKey, uid: editItem.uid, change: { mult: m } })
+                    setEditItem({ ...editItem, mult: m })
+                  }}
+                  className={`flex-1 rounded-lg py-2 text-[12px] font-semibold ${
+                    editItem.mult === m ? 'bg-series-1 text-white' : 'bg-surface-3 text-ink-2'
+                  }`}
+                >
+                  ×{m}
+                </button>
+              ))}
+            </div>
+            <p className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wider text-ink-3">
+              Move to
+            </p>
+            <div className="flex gap-1.5">
+              {['breakfast', 'lunch', 'dinner', 'snack'].map((slot) => (
+                <button
+                  key={slot}
+                  onClick={() => {
+                    dispatch({ type: 'editFood', key: todayKey, uid: editItem.uid, change: { moveTo: slot } })
+                    setEditItem(null)
+                    toast(`Moved to ${SLOT_LABELS[slot].toLowerCase()}`)
+                  }}
+                  className={`flex-1 rounded-lg py-2 text-[12px] font-medium ${
+                    editItem.slot === slot ? 'bg-series-1/20 text-series-1' : 'bg-surface-3 text-ink-2'
+                  }`}
+                >
+                  {SLOT_LABELS[slot]}
+                </button>
+              ))}
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => {
+                  dispatch({
+                    type: 'addFood',
+                    key: todayKey,
+                    item: { name: editItem.name, ...editItem.base, fiber: editItem.fiber },
+                  })
+                  setEditItem(null)
+                  toast(`Duplicated ${editItem.name}`)
+                }}
+                className="flex-1 rounded-xl bg-surface-3 py-3 text-[13px] font-semibold text-ink-2"
+              >
+                Duplicate
+              </button>
+              <button
+                onClick={() => {
+                  dispatch({ type: 'editFood', key: todayKey, uid: editItem.uid, change: { removed: true } })
+                  setEditItem(null)
+                  toast(`Removed ${editItem.name}`)
+                }}
+                className="flex-1 rounded-xl bg-critical/15 py-3 text-[13px] font-semibold text-critical"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        )}
+      </Sheet>
 
       <Sheet open={sheet === 'tdee'} onClose={() => setSheet(null)} title="Why did this change?">
         <p>

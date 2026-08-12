@@ -18,8 +18,8 @@ import {
 } from '../lib/foods'
 import { Chip, useToast } from './ui'
 import Sheet from './Sheet'
-
-const MULTIPLIERS = [0.5, 1, 1.5, 2]
+import ScoreRing from './ScoreRing'
+import { FIBER_TARGET } from '../lib/foods'
 
 function scaled(food, mult) {
   return {
@@ -28,6 +28,7 @@ function scaled(food, mult) {
     p: Math.round(food.p * mult),
     c: Math.round(food.c * mult),
     f: Math.round(food.f * mult),
+    fiber: Math.round((food.fiber ?? 0) * mult * 10) / 10,
   }
 }
 
@@ -41,11 +42,9 @@ function MacroLine({ kcal, p, c, f }) {
 
 // ---------- Search view ----------
 
-function SearchView({ addItems }) {
+function SearchView({ onDetail }) {
   const [query, setQuery] = useState('')
   const [cat, setCat] = useState('Recent')
-  const [selected, setSelected] = useState(null)
-  const [mult, setMult] = useState(1)
 
   const list = useMemo(() => {
     if (query.trim()) {
@@ -82,49 +81,161 @@ function SearchView({ addItems }) {
       )}
       <div className="mt-3 flex max-h-72 flex-col gap-1.5 overflow-y-auto no-scrollbar">
         {list.map((food) => (
-          <div key={food.name} className="rounded-xl bg-surface-3">
-            <button
-              onClick={() => {
-                setSelected(selected === food.name ? null : food.name)
-                setMult(1)
-              }}
-              className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
-            >
-              <span className="text-[20px]">{food.emoji}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-medium text-ink">{food.name}</span>
-                <span className="text-[11px] text-ink-3">
-                  {food.serving} · P {food.p}g
-                </span>
+          <button
+            key={food.name}
+            onClick={() => onDetail(food)}
+            className="flex w-full items-center gap-3 rounded-xl bg-surface-3 px-3 py-2.5 text-left"
+          >
+            <span className="text-[20px]">{food.emoji}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[14px] font-medium text-ink">{food.name}</span>
+              <span className="text-[11px] text-ink-3">
+                {food.serving} · P {food.p}g
               </span>
-              <span className="text-[13px] font-semibold text-ink-2">{food.kcal}</span>
-            </button>
-            {selected === food.name && (
-              <div className="flex items-center gap-2 border-t border-white/5 px-3 py-2.5">
-                {MULTIPLIERS.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMult(m)}
-                    className={`rounded-lg px-2.5 py-1.5 text-[12px] font-semibold ${
-                      mult === m ? 'bg-series-1 text-white' : 'bg-surface-2 text-ink-2'
-                    }`}
-                  >
-                    ×{m}
-                  </button>
-                ))}
-                <button
-                  onClick={() => addItems([scaled(food, mult)])}
-                  className="ml-auto rounded-lg bg-good px-4 py-1.5 text-[13px] font-semibold text-white"
-                >
-                  Add · {Math.round(food.kcal * mult)}
-                </button>
-              </div>
-            )}
-          </div>
+            </span>
+            <span className="text-[13px] font-semibold text-ink-2">{food.kcal}</span>
+            <span className="text-ink-3">›</span>
+          </button>
         ))}
         {!list.length && (
           <p className="py-6 text-center text-[13px] text-ink-3">No matches — try "Describe it"</p>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ---------- Food detail (the big breakdown before adding) ----------
+
+function ImpactRing({ pct, label, color }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative flex items-center justify-center">
+        <ScoreRing value={Math.min(100, pct)} color={color} size={56} stroke={5} />
+        <span className="absolute text-[12px] font-bold text-ink">{pct}%</span>
+      </div>
+      <span className="text-[10px] text-ink-3">{label}</span>
+    </div>
+  )
+}
+
+function BreakdownBar({ label, value, target, color, unit = 'g' }) {
+  const pct = Math.min(100, (value / target) * 100)
+  return (
+    <div className="mb-2.5">
+      <div className="flex items-baseline justify-between text-[12px]">
+        <span className="text-ink-2">{label}</span>
+        <span className="text-ink-3">
+          <span className="font-semibold text-ink">{value}</span> / {target} {unit} ·{' '}
+          {Math.round((value / target) * 100)}%
+        </span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-3">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+      </div>
+    </div>
+  )
+}
+
+function DetailView({ food, targets, onAdd, onBack }) {
+  const toast = useToast()
+  const [portion, setPortion] = useState(1)
+  const item = scaled(food, portion)
+  const pKcal = item.p * 4
+  const fKcal = item.f * 9
+  const cKcal = item.c * 4
+  const macroSum = Math.max(1, pKcal + fKcal + cKcal)
+  const comp = {
+    p: Math.round((pKcal / macroSum) * 100),
+    f: Math.round((fKcal / macroSum) * 100),
+    c: Math.round((cKcal / macroSum) * 100),
+  }
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <button onClick={onBack} className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-3 text-ink-2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M14.5 5 8 12l6.5 7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <span className="text-[22px]">{food.emoji}</span>
+        <h3 className="min-w-0 flex-1 truncate text-[16px] font-bold text-ink">{food.name}</h3>
+        <button
+          onClick={() => toast('Saved to favorites')}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-3 text-ink-2"
+          aria-label="Favorite"
+        >
+          ♥
+        </button>
+      </div>
+
+      {/* Hero: calories + macro composition */}
+      <div className="mt-4 flex items-end justify-between px-1">
+        <div>
+          <p className="text-[38px] font-bold leading-none text-ink">{item.kcal}</p>
+          <p className="mt-1 text-[11px] text-ink-3">calories · {food.serving}</p>
+        </div>
+        {[
+          ['Protein', item.p, comp.p, 'var(--color-protein)'],
+          ['Fat', item.f, comp.f, 'var(--color-fat)'],
+          ['Carbs', item.c, comp.c, 'var(--color-carbs)'],
+        ].map(([label, grams, pct, color]) => (
+          <div key={label} className="text-center">
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+              style={{ background: color }}
+            >
+              {pct}%
+            </span>
+            <p className="mt-1 text-[17px] font-bold text-ink">{grams}</p>
+            <p className="text-[10px] text-ink-3">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Impact on targets */}
+      <p className="mb-2 mt-5 text-[13px] font-semibold text-ink">Impact on today's targets</p>
+      <div className="flex justify-between px-2">
+        <ImpactRing pct={Math.round((item.kcal / targets.kcal) * 100)} label="Calories" color="var(--color-series-1)" />
+        <ImpactRing pct={Math.round((item.p / targets.protein) * 100)} label="Protein" color="var(--color-protein)" />
+        <ImpactRing pct={Math.round((item.f / targets.fat) * 100)} label="Fat" color="var(--color-fat)" />
+        <ImpactRing pct={Math.round((item.c / targets.carbs) * 100)} label="Carbs" color="var(--color-carbs)" />
+      </div>
+
+      {/* Carb breakdown */}
+      <p className="mb-2 mt-5 text-[13px] font-semibold text-ink">Carb breakdown</p>
+      <BreakdownBar label="Carbs" value={item.c} target={targets.carbs} color="var(--color-carbs)" />
+      <BreakdownBar label="Fiber" value={item.fiber ?? 0} target={FIBER_TARGET} color="var(--color-good)" />
+      <div className="flex items-baseline justify-between text-[12px]">
+        <span className="text-ink-2">Net (non-fiber)</span>
+        <span className="font-semibold text-ink">{Math.max(0, Math.round((item.c - (item.fiber ?? 0)) * 10) / 10)} g</span>
+      </div>
+
+      {/* Portion + add */}
+      <div className="mt-5 flex items-center gap-3 border-t border-white/5 pt-4">
+        <div className="flex items-center gap-1 rounded-xl bg-surface-3 p-1">
+          <button
+            onClick={() => setPortion(Math.max(0.5, portion - 0.5))}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[17px] text-ink-2"
+          >
+            −
+          </button>
+          <span className="w-16 text-center text-[13px] font-semibold text-ink">
+            {portion} <span className="font-normal text-ink-3">portion</span>
+          </span>
+          <button
+            onClick={() => setPortion(portion + 0.5)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[17px] text-ink-2"
+          >
+            +
+          </button>
+        </div>
+        <button
+          onClick={() => onAdd([item])}
+          className="flex-1 rounded-xl bg-good py-3 text-[14px] font-semibold text-white"
+        >
+          Add · {item.kcal} kcal
+        </button>
       </div>
     </div>
   )
@@ -180,7 +291,7 @@ function DescribeView({ addItems }) {
 
 // ---------- Scan / capture mock ----------
 
-function ScanView({ mode, addItems }) {
+function ScanView({ mode, onDetail }) {
   const demo = foodByName(mode === 'barcode' ? 'Protein bar' : 'Chicken burrito bowl')
   return (
     <div>
@@ -194,7 +305,7 @@ function ScanView({ mode, addItems }) {
         </span>
       </div>
       <button
-        onClick={() => addItems([scaled(demo, 1)])}
+        onClick={() => onDetail(demo)}
         className="mt-3 w-full rounded-xl bg-series-1 py-3 text-[14px] font-semibold text-white"
       >
         Simulate {mode === 'barcode' ? 'scan' : 'capture'} → {demo.emoji} {demo.name}
@@ -339,16 +450,28 @@ export default function FoodFlows({ view, onClose }) {
   const { days, today, todayKey, dispatch } = useStore()
   const toast = useToast()
   const [current, setCurrent] = useState(view)
+  const [detailFood, setDetailFood] = useState(null)
+  const [cameFrom, setCameFrom] = useState('search')
   useEffect(() => setCurrent(view), [view])
 
-  const remaining = useMemo(() => {
+  const targets = useMemo(() => {
     const checkIn = weeklyCheckIn(days)
-    const targets = macroTargets(checkIn?.newTarget ?? 2050)
-    return {
+    return macroTargets(checkIn?.newTarget ?? 2050)
+  }, [days])
+
+  const remaining = useMemo(
+    () => ({
       kcal: Math.max(0, targets.kcal - today.intake.kcal),
       protein: Math.max(0, targets.protein - today.intake.protein),
-    }
-  }, [days, today])
+    }),
+    [targets, today],
+  )
+
+  function openDetail(food, from) {
+    setDetailFood(food)
+    setCameFrom(from)
+    setCurrent('detail')
+  }
 
   function addItems(items) {
     for (const item of items) dispatch({ type: 'addFood', key: todayKey, item })
@@ -367,7 +490,7 @@ export default function FoodFlows({ view, onClose }) {
     <Sheet open={current != null} onClose={onClose} title={TITLES[current]}>
       {current === 'search' && (
         <>
-          <SearchView addItems={addItems} />
+          <SearchView onDetail={(food) => openDetail(food, 'search')} />
           <div className="mt-3 flex gap-2 border-t border-white/5 pt-3">
             {[
               ['barcode', '║▌║ Scan'],
@@ -385,9 +508,21 @@ export default function FoodFlows({ view, onClose }) {
           </div>
         </>
       )}
+      {current === 'detail' && detailFood && (
+        <DetailView
+          food={detailFood}
+          targets={targets}
+          onAdd={addItems}
+          onBack={() => setCurrent(cameFrom)}
+        />
+      )}
       {current === 'describe' && <DescribeView addItems={addItems} />}
-      {current === 'barcode' && <ScanView mode="barcode" addItems={addItems} />}
-      {current === 'photo' && <ScanView mode="photo" addItems={addItems} />}
+      {current === 'barcode' && (
+        <ScanView mode="barcode" onDetail={(food) => openDetail(food, 'barcode')} />
+      )}
+      {current === 'photo' && (
+        <ScanView mode="photo" onDetail={(food) => openDetail(food, 'photo')} />
+      )}
       {current === 'templates' && <TemplatesView addItems={addItems} remaining={remaining} />}
       {current === 'activity' && <ActivityView onLog={logActivity} />}
     </Sheet>

@@ -11,11 +11,79 @@ const STORAGE_KEY = `fitmock.v${SEED_VERSION}`
 const defaultUserState = {
   weighIns: {}, // { 'YYYY-MM-DD': lb }
   extraMeals: {}, // { 'YYYY-MM-DD': [mealItem] }
+  foodEdits: {}, // { 'YYYY-MM-DD': { [itemUid]: { mult?, removed?, moveTo? } } }
   activities: {}, // { 'YYYY-MM-DD': [{ type, minutes, kcal }] }
   completedSession: null, // { key, session } — today's logged workout
   bonusXP: 0,
   activeProgramId: 'arnold-split',
   settings: { units: 'lb', notifications: true },
+}
+
+const SLOT_ORDER = ['breakfast', 'lunch', 'dinner', 'snack', 'logged']
+const SLOT_TIMES = {
+  breakfast: '7:40 AM',
+  lunch: '12:30 PM',
+  dinner: '7:15 PM',
+  snack: '9:30 PM',
+  logged: 'Just now',
+}
+
+function makeItem(uid, raw, mult) {
+  return {
+    uid,
+    name: raw.name,
+    fiber: raw.fiber,
+    mult,
+    base: { kcal: raw.kcal, p: raw.p, c: raw.c, f: raw.f },
+    kcal: Math.round(raw.kcal * mult),
+    p: Math.round(raw.p * mult),
+    c: Math.round(raw.c * mult),
+    f: Math.round(raw.f * mult),
+  }
+}
+
+// Rebuild a day's meals with stable per-item uids, applying the user's
+// portion/move/remove edits and appending quick-added items.
+function rebuildMeals(day, extras, edits) {
+  const buckets = {}
+  const push = (slot, item) => (buckets[slot] ??= []).push(item)
+  for (const meal of day.meals) {
+    meal.items.forEach((raw, idx) => {
+      const uid = `${meal.slot}:${idx}`
+      const e = edits[uid]
+      if (e?.removed) return
+      push(e?.moveTo ?? meal.slot, makeItem(uid, raw, e?.mult ?? 1))
+    })
+  }
+  extras.forEach((raw, idx) => {
+    const uid = `logged:${idx}`
+    const e = edits[uid]
+    if (e?.removed) return
+    push(e?.moveTo ?? 'logged', makeItem(uid, raw, e?.mult ?? 1))
+  })
+  const meals = SLOT_ORDER.filter((s) => buckets[s]?.length).map((slot) => {
+    const items = buckets[slot]
+    const sum = (f) => items.reduce((s, it) => s + it[f], 0)
+    const orig = day.meals.find((m) => m.slot === slot)
+    return {
+      slot,
+      time: orig?.time ?? SLOT_TIMES[slot],
+      items,
+      kcal: sum('kcal'),
+      p: sum('p'),
+      c: sum('c'),
+      f: sum('f'),
+    }
+  })
+  return {
+    meals,
+    intake: {
+      kcal: meals.reduce((s, m) => s + m.kcal, 0),
+      protein: meals.reduce((s, m) => s + m.p, 0),
+      carbs: meals.reduce((s, m) => s + m.c, 0),
+      fat: meals.reduce((s, m) => s + m.f, 0),
+    },
+  }
 }
 
 function loadUserState() {
@@ -43,6 +111,19 @@ function reducer(state, action) {
       return {
         ...state,
         extraMeals: { ...state.extraMeals, [action.key]: [...list, action.item] },
+      }
+    }
+    case 'editFood': {
+      const dayEdits = state.foodEdits[action.key] ?? {}
+      return {
+        ...state,
+        foodEdits: {
+          ...state.foodEdits,
+          [action.key]: {
+            ...dayEdits,
+            [action.uid]: { ...dayEdits[action.uid], ...action.change },
+          },
+        },
       }
     }
     case 'logActivity': {
@@ -91,27 +172,10 @@ export function StoreProvider({ children }) {
       let out = d
       const w = userState.weighIns[d.key]
       if (w != null) out = { ...out, weightLb: w }
-      const extras = userState.extraMeals[d.key]
-      if (extras?.length) {
-        const extraMeal = {
-          slot: 'logged',
-          time: 'Just now',
-          items: extras,
-          kcal: extras.reduce((s, it) => s + it.kcal, 0),
-          p: extras.reduce((s, it) => s + it.p, 0),
-          c: extras.reduce((s, it) => s + it.c, 0),
-          f: extras.reduce((s, it) => s + it.f, 0),
-        }
-        out = {
-          ...out,
-          meals: [...out.meals, extraMeal],
-          intake: {
-            kcal: out.intake.kcal + extraMeal.kcal,
-            protein: out.intake.protein + extraMeal.p,
-            carbs: out.intake.carbs + extraMeal.c,
-            fat: out.intake.fat + extraMeal.f,
-          },
-        }
+      // Meals always rebuilt with stable uids so log entries are editable
+      out = {
+        ...out,
+        ...rebuildMeals(d, userState.extraMeals[d.key] ?? [], userState.foodEdits[d.key] ?? {}),
       }
       const acts = userState.activities[d.key]
       if (acts?.length) {

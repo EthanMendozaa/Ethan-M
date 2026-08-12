@@ -52,6 +52,41 @@ export const FOOD_DB = [
   { name: 'Trail mix', emoji: '🥨', serving: '1/4 cup', kcal: 175, p: 5, c: 16, f: 11, cat: 'Snacks' },
 ]
 
+// Fiber grams per serving (foods not listed are ~0)
+const FIBER = {
+  Oatmeal: 4,
+  Banana: 3.1,
+  Apple: 4.4,
+  'Mixed berries': 4,
+  'Sweet potato': 3.9,
+  'Brown rice': 3.5,
+  'White rice': 0.6,
+  Pasta: 2.5,
+  'Sourdough bread': 1.9,
+  Bagel: 2.1,
+  Tortilla: 1.4,
+  Avocado: 5,
+  'Peanut butter': 1.9,
+  Almonds: 3.5,
+  'Chicken burrito bowl': 9,
+  'Turkey club wrap': 4,
+  'Salmon rice bowl': 4.5,
+  'Chicken stir-fry': 5,
+  Cheeseburger: 2,
+  'Pepperoni pizza': 3,
+  'Salmon sushi': 2,
+  'Chicken caesar salad': 3,
+  'Hummus & pita': 4.5,
+  'Trail mix': 2.2,
+  'Rice cakes': 0.6,
+  'Tortilla chips': 1.2,
+  'Protein bar': 3,
+  Tofu: 1.9,
+}
+for (const food of FOOD_DB) food.fiber = FIBER[food.name] ?? 0
+
+export const FIBER_TARGET = 33
+
 export const CATEGORIES = ['All', 'Protein', 'Carbs', 'Fats', 'Meals', 'Snacks']
 
 export const RECENT_FOODS = [
