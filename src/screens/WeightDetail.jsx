@@ -48,14 +48,27 @@ function StatTile({ label, value, unit, accent }) {
 }
 
 export default function WeightDetail({ onClose }) {
-  const { days, todayKey, dispatch } = useStore()
+  const { days, todayKey, dispatch, userState } = useStore()
   const toast = useToast()
   const [range, setRange] = useState('3M')
   const [sheet, setSheet] = useState(null)
   const [weightInput, setWeightInput] = useState('')
 
-  const journey = useMemo(() => weightJourney(days), [days])
-  const milestones = useMemo(() => weightMilestones(days), [days])
+  const goal = userState.goal ?? { phase: 'cut', goalWeight: 145, weeklyRateLb: -0.96 }
+  const journey = useMemo(
+    () => weightJourney(days, goal.goalWeight, goal.phase),
+    [days, goal],
+  )
+  const milestones = useMemo(
+    () => weightMilestones(days, goal.phase === 'bulk' ? 'up' : 'down'),
+    [days, goal.phase],
+  )
+  const phaseLabel =
+    goal.phase === 'bulk'
+      ? `Bulk · +${Math.abs(goal.weeklyRateLb)} lb/wk`
+      : goal.phase === 'maintain'
+        ? 'Maintain'
+        : `Cut · ${goal.weeklyRateLb} lb/wk`
   const streak = useMemo(() => weighInStreak(days), [days])
   const today = days[days.length - 1]
   const hasWeighedIn = today.weightLb != null
@@ -84,7 +97,9 @@ export default function WeightDetail({ onClose }) {
   }
 
   if (!journey) return null
-  const dropping = journey.weekDelta < -0.05
+  // "Favorable" is direction-aware: down on a cut, up on a bulk
+  const dropping =
+    goal.phase === 'bulk' ? journey.weekDelta > 0.05 : journey.weekDelta < -0.05
 
   return (
     // z-20: above the tab bar (z-10), below the phone status bar (z-30)
@@ -96,7 +111,7 @@ export default function WeightDetail({ onClose }) {
           </svg>
           Back
         </button>
-        <Chip tone="accent">Cut · −1.0 lb/wk</Chip>
+        <Chip tone="accent">{phaseLabel}</Chip>
       </header>
 
       <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-10">
@@ -113,7 +128,8 @@ export default function WeightDetail({ onClose }) {
                 dropping ? 'bg-good/15 text-good' : 'bg-surface-2 text-ink-2'
               }`}
             >
-              {dropping ? '↓' : '→'} {Math.abs(journey.weekDelta).toFixed(1)} this wk
+              {journey.weekDelta < -0.05 ? '↓' : journey.weekDelta > 0.05 ? '↑' : '→'}{' '}
+              {Math.abs(journey.weekDelta).toFixed(1)} this wk
             </span>
           </div>
           <p className="mt-2 text-[13px] text-ink-3">
@@ -130,7 +146,10 @@ export default function WeightDetail({ onClose }) {
         {/* Goal progress */}
         <Card className="mb-6 !p-5 shadow-lg shadow-black/25 ring-1 ring-white/5">
           <div className="flex items-baseline justify-between">
-            <p className="text-[13px] font-semibold text-ink">Cut goal · {journey.goalLb.toFixed(0)} lb</p>
+            <p className="text-[13px] font-semibold text-ink">
+              {goal.phase === 'bulk' ? 'Bulk' : goal.phase === 'maintain' ? 'Hold' : 'Cut'} goal ·{' '}
+              {journey.goalLb.toFixed(0)} lb
+            </p>
             <p className="text-[12px] text-ink-3">{journey.toGo.toFixed(1)} lb to go</p>
           </div>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-3">
@@ -295,11 +314,13 @@ export default function WeightDetail({ onClose }) {
                     i === 0 ? 'bg-good/15 text-good' : 'bg-surface-2 text-ink-2'
                   }`}
                 >
-                  ↓{m.lb}
+                  {goal.phase === 'bulk' ? '↑' : '↓'}
+                  {m.lb}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[14px] font-semibold text-ink">
-                    Dropped under {m.lb} lb{i === 0 ? ' — latest!' : ''}
+                    {goal.phase === 'bulk' ? 'Crossed' : 'Dropped under'} {m.lb} lb
+                    {i === 0 ? ' — latest!' : ''}
                   </p>
                   <p className="text-[11px] text-ink-3">{longDate(m.key)}</p>
                 </div>
@@ -308,7 +329,7 @@ export default function WeightDetail({ onClose }) {
             ))}
           {milestones.length > 5 && (
             <p className="pt-1 text-center text-[11px] text-ink-3">
-              +{milestones.length - 5} earlier drops this cut
+              +{milestones.length - 5} earlier milestones this phase
             </p>
           )}
         </div>

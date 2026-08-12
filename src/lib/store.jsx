@@ -16,6 +16,7 @@ const defaultUserState = {
   completedSession: null, // { key, session } — today's logged workout
   bonusXP: 0,
   calorieTarget: 2050, // updated when the user applies a coach suggestion
+  goal: { phase: 'cut', goalWeight: 145, weeklyRateLb: -0.96 }, // the plan the coach steers toward
   activeProgramId: 'arnold-split',
   settings: { units: 'lb', notifications: true },
   onboarded: false,
@@ -144,6 +145,8 @@ function reducer(state, action) {
       }
     case 'setCalorieTarget':
       return { ...state, calorieTarget: action.target }
+    case 'setGoal':
+      return { ...state, goal: { ...state.goal, ...action.goal } }
     case 'completeOnboarding':
       return {
         ...state,
@@ -151,6 +154,7 @@ function reducer(state, action) {
         profile: action.profile,
         calorieTarget: action.profile.calorieTarget ?? state.calorieTarget,
         activeProgramId: action.profile.programId ?? state.activeProgramId,
+        goal: action.profile.goal ?? state.goal,
       }
     case 'setProgram':
       return { ...state, activeProgramId: action.programId }

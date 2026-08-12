@@ -60,6 +60,10 @@ export const REFERENCES = {
     'Peos JJ et al. (2021). Continuous versus intermittent dieting in resistance-trained adults: the ICECAP trial. Med Sci Sports Exerc 53(8).',
   wishnofsky1958:
     'Wishnofsky M (1958). Caloric equivalents of gained or lost weight. Am J Clin Nutr 6(5).',
+  iraki2019:
+    'Iraki J et al. (2019). Nutrition recommendations for bodybuilders in the off-season: a narrative review. Sports 7(7).',
+  trexler2014:
+    'Trexler ET et al. (2014). Metabolic adaptation to weight loss: implications for the athlete. J Int Soc Sports Nutr 11:7.',
 }
 
 // Rest between hard sets: longer rest preserves output on the next set
@@ -336,7 +340,7 @@ export function estimateRMR(weightLb, { heightCm, age, sex } = PROFILE) {
   return Math.round(10 * kg + 6.25 * heightCm - 5 * age + (sex === 'm' ? 5 : -161))
 }
 
-export function calorieCoach(days, currentTarget) {
+export function calorieCoach(days, currentTarget, goal) {
   const trend = trendWeightSeries(days).filter((t) => t.trend != null)
   const weighIns14 = days.slice(-14).filter((d) => d.weightLb != null).length
   const tdee = tdeeAt(days, days.length - 1)
@@ -344,21 +348,48 @@ export function calorieCoach(days, currentTarget) {
     return { status: 'collecting', needed: 10 - weighIns14 }
   }
 
+  const phase = goal?.phase ?? 'cut'
   const bw = trend[trend.length - 1].trend
   const span = Math.min(14, trend.length - 1)
   const observedRate =
     Math.round((((trend[trend.length - 1].trend - trend[trend.length - 1 - span].trend) / span) * 7) * 100) / 100
-  const targetRate = -Math.round(0.0065 * bw * 100) / 100 // lb/wk
+  const targetRate =
+    phase === 'maintain' ? 0 : (goal?.weeklyRateLb ?? -Math.round(0.0065 * bw * 100) / 100)
   const rationale = [
     {
       text: `Expenditure ${tdee.toLocaleString()} kcal/day from your last 14 days of weigh-ins + intake`,
       ref: 'wishnofsky1958',
     },
     {
-      text: `Trending ${observedRate} lb/wk vs ${targetRate} target (0.65% of ${bw.toFixed(0)} lb)`,
-      ref: 'helms2014',
+      text:
+        phase === 'maintain'
+          ? `Trending ${observedRate} lb/wk vs holding steady`
+          : `Trending ${observedRate} lb/wk vs ${targetRate} target (${phase})`,
+      ref: phase === 'bulk' ? 'iraki2019' : 'helms2014',
     },
   ]
+
+  // Goal reached → hold at maintenance before the next phase
+  if (goal?.goalWeight && phase !== 'maintain') {
+    const reached = phase === 'cut' ? bw <= goal.goalWeight + 0.5 : bw >= goal.goalWeight - 0.5
+    if (reached) {
+      const maint = Math.round(tdee / 10) * 10
+      rationale.push({
+        text: `Goal weight reached — hold ~${maint.toLocaleString()} kcal for 2-4 weeks before the next phase`,
+        ref: 'trexler2014',
+      })
+      return {
+        status: 'goal-reached',
+        suggested: maint,
+        delta: maint - currentTarget,
+        tdee,
+        observedRate,
+        targetRate: 0,
+        dietBreak: null,
+        rationale,
+      }
+    }
+  }
 
   const ideal = Math.round((tdee + (targetRate * 3500) / 7) / 10) * 10
   let suggested = Math.max(currentTarget - 150, Math.min(currentTarget + 150, ideal))
@@ -372,7 +403,7 @@ export function calorieCoach(days, currentTarget) {
     rationale.push({ text: `Floored at estimated resting expenditure (${rmr} kcal)`, ref: 'mifflin1990' })
   }
 
-  if (observedRate < -0.0125 * bw) {
+  if (phase !== 'bulk' && observedRate < -0.0125 * bw) {
     suggested = Math.max(suggested, currentTarget + 100)
     rationale.push({
       text: `Losing faster than 1.25% BW/wk — raising intake to protect lean mass`,
@@ -380,10 +411,18 @@ export function calorieCoach(days, currentTarget) {
     })
   }
 
-  // Diet-break check: long continuous deficit + suppressed HRV
+  if (phase === 'bulk' && observedRate > Math.max(0.6, 2 * targetRate)) {
+    suggested = Math.min(suggested, currentTarget - 100)
+    rationale.push({
+      text: `Gaining faster than the lean-bulk range — trimming the surplus`,
+      ref: 'iraki2019',
+    })
+  }
+
+  // Diet-break check: long continuous deficit + suppressed HRV (cut only)
   const hrv = hrvReadiness(days)
   const sixWeeksAgo = trend[Math.max(0, trend.length - 43)].trend
-  const longDeficit = bw < sixWeeksAgo - 3
+  const longDeficit = phase === 'cut' && bw < sixWeeksAgo - 3
   let dietBreak = null
   if (longDeficit && hrv?.state === 'low') {
     dietBreak = Math.round(tdee / 10) * 10

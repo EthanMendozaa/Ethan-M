@@ -18,8 +18,9 @@ export function trendWeightSeries(days) {
   return out
 }
 
-// Weight-journey stats for the dedicated Weight screen.
-export function weightJourney(days, goalLb = 145) {
+// Weight-journey stats for the dedicated Weight screen. Direction-aware:
+// a bulk counts progress upward, a cut downward.
+export function weightJourney(days, goalLb = 145, phase = 'cut') {
   const trend = trendWeightSeries(days).filter((t) => t.trend != null)
   if (trend.length < 8) return null
   const now = trend[trend.length - 1].trend
@@ -29,37 +30,49 @@ export function weightJourney(days, goalLb = 145) {
   const weekDelta = Math.round((now - weekAgo) * 10) / 10
   const span = Math.min(28, trend.length - 1)
   const ratePerWeek = Math.round(((now - monthAgo) / span) * 7 * 100) / 100
-  // Projected goal date at the current 28-day rate
+  // Projected goal date at the current 28-day rate (only if moving toward it)
   let goalKey = null
-  if (ratePerWeek < -0.05 && now > goalLb) {
-    const daysLeft = Math.round((now - goalLb) / (-ratePerWeek / 7))
+  const gap = goalLb - now // negative when cutting toward a lower goal
+  if (Math.abs(ratePerWeek) > 0.05 && Math.sign(gap) === Math.sign(ratePerWeek)) {
+    const daysLeft = Math.round(Math.abs(gap) / (Math.abs(ratePerWeek) / 7))
     if (daysLeft < 400) goalKey = addDaysKey(trend[trend.length - 1].key, daysLeft)
   }
   return {
     now,
     start,
+    phase,
     weekDelta,
     ratePerWeek,
     totalDelta: Math.round((now - start) * 10) / 10,
     goalLb,
     goalKey,
-    toGo: Math.round((now - goalLb) * 10) / 10,
-    progress: Math.max(0, Math.min(1, (start - now) / Math.max(0.1, start - goalLb))),
+    toGo: Math.round(Math.abs(now - goalLb) * 10) / 10,
+    progress: Math.max(0, Math.min(1, (start - now) / (start - goalLb || 0.1))),
   }
 }
 
-// Every whole-pound line crossed on the way down ("drops"), newest first.
-export function weightMilestones(days) {
+// Every whole-pound line crossed toward the goal, newest first.
+// direction 'down' → "dropped under N"; 'up' → "crossed N".
+export function weightMilestones(days, direction = 'down') {
   const trend = trendWeightSeries(days).filter((t) => t.trend != null)
   const seen = new Set()
   const out = []
   for (let i = 1; i < trend.length; i++) {
     const prev = trend[i - 1].trend
     const cur = trend[i].trend
-    for (let m = Math.floor(prev); m > cur; m--) {
-      if (prev >= m && cur < m && !seen.has(m)) {
-        seen.add(m)
-        out.push({ lb: m, key: trend[i].key })
+    if (direction === 'down') {
+      for (let m = Math.floor(prev); m > cur; m--) {
+        if (prev >= m && cur < m && !seen.has(m)) {
+          seen.add(m)
+          out.push({ lb: m, key: trend[i].key })
+        }
+      }
+    } else {
+      for (let m = Math.ceil(prev); m < cur; m++) {
+        if (prev <= m && cur > m && !seen.has(m)) {
+          seen.add(m)
+          out.push({ lb: m, key: trend[i].key })
+        }
       }
     }
   }

@@ -61,22 +61,26 @@ export default function Onboarding() {
     const factor = ACTIVITY.find((a) => a.id === activity)?.factor ?? 1.75
     const tdee = Math.round((rmr * factor) / 10) * 10
     const rate = (pct) => Math.round((tdee + ((-pct * weightLb * 3500) / 100) / 7) / 10) * 10
+    const lb = (pct) => Math.round(((pct * weightLb) / 100) * 100) / 100
     if (goal === 'maintain')
-      return { tdee, options: [{ id: 'recommended', label: 'Maintain', kcal: tdee, note: '±0 lb/wk' }] }
+      return {
+        tdee,
+        options: [{ id: 'recommended', label: 'Maintain', kcal: tdee, note: '±0 lb/wk', rateLb: 0 }],
+      }
     if (goal === 'bulk')
       return {
         tdee,
         options: [
-          { id: 'relaxed', label: 'Slow gain', kcal: tdee + 150, note: '+0.25 lb/wk' },
-          { id: 'recommended', label: 'Lean bulk', kcal: tdee + 300, note: '+0.5 lb/wk' },
+          { id: 'relaxed', label: 'Slow gain', kcal: tdee + 150, note: '+0.25 lb/wk', rateLb: 0.25 },
+          { id: 'recommended', label: 'Lean bulk', kcal: tdee + 300, note: '+0.5 lb/wk', rateLb: 0.5 },
         ],
       }
     return {
       tdee,
       options: [
-        { id: 'relaxed', label: 'Relaxed', kcal: rate(0.4), note: `−${((0.4 * weightLb) / 100).toFixed(1)} lb/wk` },
-        { id: 'recommended', label: 'Recommended', kcal: rate(0.65), note: `−${((0.65 * weightLb) / 100).toFixed(1)} lb/wk` },
-        { id: 'aggressive', label: 'Aggressive', kcal: rate(1.0), note: `−${((1.0 * weightLb) / 100).toFixed(1)} lb/wk` },
+        { id: 'relaxed', label: 'Relaxed', kcal: rate(0.4), note: `−${lb(0.4)} lb/wk`, rateLb: -lb(0.4) },
+        { id: 'recommended', label: 'Recommended', kcal: rate(0.65), note: `−${lb(0.65)} lb/wk`, rateLb: -lb(0.65) },
+        { id: 'aggressive', label: 'Aggressive', kcal: rate(1.0), note: `−${lb(1.0)} lb/wk`, rateLb: -lb(1.0) },
       ],
     }
   }, [weightLb, heightIn, age, sex, activity, goal])
@@ -91,10 +95,14 @@ export default function Onboarding() {
         heightIn,
         weightLb,
         activity,
-        goal,
         goalWeight,
         programId,
         calorieTarget: chosen.kcal,
+        goal: {
+          phase: goal,
+          goalWeight: goal === 'maintain' ? weightLb : goalWeight,
+          weeklyRateLb: chosen.rateLb ?? 0,
+        },
       },
     })
   }

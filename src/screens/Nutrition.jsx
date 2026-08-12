@@ -58,7 +58,11 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
   const [editItem, setEditItem] = useState(null) // { uid, name, base, mult, slot }
 
   const calorieTarget = userState.calorieTarget ?? 2050
-  const coach = useMemo(() => calorieCoach(days, calorieTarget), [days, calorieTarget])
+  const goal = userState.goal ?? { phase: 'cut', goalWeight: 145, weeklyRateLb: -0.96 }
+  const coach = useMemo(
+    () => calorieCoach(days, calorieTarget, goal),
+    [days, calorieTarget, goal],
+  )
   const targets = useMemo(() => macroTargets(calorieTarget), [calorieTarget])
   const tdee = useMemo(() => tdeeAt(days, days.length - 1), [days])
 
@@ -82,7 +86,13 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
     <div className="pt-2">
       <header className="mb-3 flex items-center justify-between px-1">
         <h1 className="text-[24px] font-bold text-ink">Nutrition</h1>
-        <Chip tone="accent">Cut · −1.0 lb/wk</Chip>
+        <Chip tone="accent">
+          {goal.phase === 'bulk'
+            ? `Bulk · +${Math.abs(goal.weeklyRateLb)} lb/wk`
+            : goal.phase === 'maintain'
+              ? 'Maintain'
+              : `Cut · ${goal.weeklyRateLb} lb/wk`}
+        </Chip>
       </header>
 
       <Card>
@@ -144,10 +154,18 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
       </Card>
 
       <SectionTitle>Calorie coach</SectionTitle>
-      {coach.status === 'suggest' ? (
-        <Card className="border border-series-1/20">
+      {coach.status === 'suggest' || coach.status === 'goal-reached' ? (
+        <Card
+          className={
+            coach.status === 'goal-reached'
+              ? 'border border-good/30'
+              : 'border border-series-1/20'
+          }
+        >
           <div className="flex items-center justify-between">
-            <Chip tone="accent">Suggested update</Chip>
+            <Chip tone={coach.status === 'goal-reached' ? 'good' : 'accent'}>
+              {coach.status === 'goal-reached' ? '🎉 Goal reached' : 'Suggested update'}
+            </Chip>
             <button onClick={() => setSheet('coach')} className="text-[12px] font-medium text-series-1">
               Why?
             </button>
