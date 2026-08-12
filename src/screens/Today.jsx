@@ -54,7 +54,7 @@ function strainBand(rec) {
   return [25, 45]
 }
 
-export default function Today({ onNavigate, onOpenWeight }) {
+export default function Today({ onNavigate, onOpenWeight, sync }) {
   const { days, todayKey, plannedSession, dispatch } = useStore()
   const toast = useToast()
   const [sheet, setSheet] = useState(null)
@@ -140,8 +140,21 @@ export default function Today({ onNavigate, onOpenWeight }) {
 
   const weekDays = days.slice(-7)
 
+  // Pull-to-refresh → resync (touch devices; the pill is the tap affordance)
+  const touchStart = (e) => {
+    const main = e.currentTarget.closest('main')
+    if (main && main.scrollTop <= 0) e.currentTarget.dataset.pull = e.touches[0].clientY
+  }
+  const touchMove = (e) => {
+    const start = e.currentTarget.dataset.pull
+    if (start && e.touches[0].clientY - Number(start) > 80 && sync?.status !== 'syncing') {
+      delete e.currentTarget.dataset.pull
+      sync?.resync()
+    }
+  }
+
   return (
-    <div className="pt-2">
+    <div className="pt-2" onTouchStart={touchStart} onTouchMove={touchMove}>
       <header className="mb-3 flex items-center justify-between px-1">
         <div>
           <p className="text-[12px] font-medium text-ink-3">{longDate(day.key)}</p>
@@ -157,6 +170,24 @@ export default function Today({ onNavigate, onOpenWeight }) {
           E
         </button>
       </header>
+
+      {/* Live Health Connect sync — auto on open, tap to resync */}
+      <button
+        onClick={sync?.status === 'done' ? sync.resync : undefined}
+        className="mb-3 inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-[11px] font-medium text-ink-2"
+      >
+        {sync?.status === 'syncing' ? (
+          <>
+            <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-ink-3 border-t-transparent" />
+            Syncing · {sync.step}…
+          </>
+        ) : (
+          <>
+            <span className="h-1.5 w-1.5 rounded-full bg-good" />
+            Fitbit via Health Connect · synced just now
+          </>
+        )}
+      </button>
 
       {/* Week strip — tap a day to review it */}
       <div className="mb-4 flex justify-between px-1">
@@ -189,7 +220,7 @@ export default function Today({ onNavigate, onOpenWeight }) {
       </div>
 
       {/* Recovery hero */}
-      <Card onClick={() => setSheet('recovery')} className="!p-5">
+      <Card onClick={() => setSheet('recovery')} className="!p-5" flash={sync?.justSynced}>
         <div className="flex flex-col items-center">
           <ArcGauge value={rec} color={recBand.color} size={158}>
             <span className="text-[42px] font-bold leading-none text-ink">{rec}</span>

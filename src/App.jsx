@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { StoreProvider } from './lib/store'
+import { useHealthSync } from './lib/useSync'
 import { ToastProvider } from './components/ui'
 import PhoneFrame from './components/PhoneFrame'
 import TabBar from './components/TabBar'
@@ -18,6 +19,7 @@ export default function App() {
   const [quickOpen, setQuickOpen] = useState(false)
   const [foodView, setFoodView] = useState(null) // search | describe | barcode | photo | templates | activity
   const [pendingWorkout, setPendingWorkout] = useState(false)
+  const sync = useHealthSync()
 
   const openWeight = () => setWeightOpen(true)
   const openFood = (view = 'search') => setFoodView(view)
@@ -41,7 +43,7 @@ export default function App() {
           {/* Sheets/toasts position against the phone frame, so main stays non-positioned */}
           <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
             {tab === 'today' && (
-              <Today onNavigate={setTab} onOpenWeight={openWeight} />
+              <Today onNavigate={setTab} onOpenWeight={openWeight} sync={sync} />
             )}
             {tab === 'nutrition' && (
               <Nutrition onOpenWeight={openWeight} onAddFood={openFood} />
