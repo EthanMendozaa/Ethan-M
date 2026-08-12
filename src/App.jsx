@@ -12,6 +12,7 @@ import Train from './screens/Train'
 import Stats from './screens/Stats'
 import Profile from './screens/Profile'
 import WeightDetail from './screens/WeightDetail'
+import GoalPage from './screens/GoalPage'
 import Onboarding from './screens/Onboarding'
 import { useStore } from './lib/store'
 
@@ -24,6 +25,7 @@ function AppShell(props) {
 export default function App() {
   const [tab, setTab] = useState('today')
   const [weightOpen, setWeightOpen] = useState(false)
+  const [goalOpen, setGoalOpen] = useState(false)
   const [quickOpen, setQuickOpen] = useState(false)
   const [foodView, setFoodView] = useState(null) // search | describe | barcode | photo | templates | activity
   const [pendingWorkout, setPendingWorkout] = useState(false)
@@ -55,16 +57,23 @@ export default function App() {
               <Today onNavigate={setTab} onOpenWeight={openWeight} sync={sync} />
             )}
             {tab === 'nutrition' && (
-              <Nutrition onOpenWeight={openWeight} onAddFood={openFood} />
+              <Nutrition
+                onOpenWeight={openWeight}
+                onAddFood={openFood}
+                onOpenGoal={() => setGoalOpen(true)}
+              />
             )}
             {tab === 'train' && (
               <Train autoStart={pendingWorkout} onAutoStarted={() => setPendingWorkout(false)} />
             )}
             {tab === 'stats' && <Stats onOpenWeight={openWeight} />}
-            {tab === 'profile' && <Profile onNavigate={setTab} />}
+            {tab === 'profile' && (
+              <Profile onNavigate={setTab} onOpenGoal={() => setGoalOpen(true)} />
+            )}
           </main>
           <TabBar active={tab} onChange={setTab} onPlus={() => setQuickOpen(true)} />
           {weightOpen && <WeightDetail onClose={() => setWeightOpen(false)} />}
+          {goalOpen && <GoalPage onClose={() => setGoalOpen(false)} />}
           <QuickActions
             open={quickOpen}
             onClose={() => setQuickOpen(false)}

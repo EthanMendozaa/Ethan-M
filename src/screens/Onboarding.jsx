@@ -286,6 +286,11 @@ export default function Onboarding() {
         {step === 5 && (
           <div className="pt-6">
             <h2 className="text-[24px] font-bold text-ink">Your calorie plan</h2>
+            {goal !== 'maintain' && (
+              <p className="mt-1 text-[13px] font-medium text-ink-2">
+                Goal: {goal === 'cut' ? 'lose to' : 'gain to'} {goalWeight} lb
+              </p>
+            )}
             <p className="mt-1 text-[13px] text-ink-3">
               Estimated expenditure ~{calorieOptions.tdee.toLocaleString()} kcal/day — it will
               recalibrate from your weigh-ins

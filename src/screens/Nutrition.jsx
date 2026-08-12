@@ -51,7 +51,7 @@ const SLOT_LABELS = {
   logged: 'Quick add',
 }
 
-export default function Nutrition({ onOpenWeight, onAddFood }) {
+export default function Nutrition({ onOpenWeight, onAddFood, onOpenGoal }) {
   const { days, today, todayKey, dispatch, userState } = useStore()
   const toast = useToast()
   const [sheet, setSheet] = useState(null)
@@ -153,7 +153,15 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
         <p className="mt-2 text-[11px] text-ink-3">From 14 days of weigh-ins + intake</p>
       </Card>
 
-      <SectionTitle>Calorie coach</SectionTitle>
+      <SectionTitle
+        right={
+          <button onClick={onOpenGoal} className="text-[12px] font-medium text-series-1">
+            Strategy →
+          </button>
+        }
+      >
+        Calorie coach
+      </SectionTitle>
       {coach.status === 'suggest' || coach.status === 'goal-reached' ? (
         <Card
           className={

@@ -42,12 +42,6 @@ const PHASE_META = {
   bulk: { title: 'Build muscle', chip: 'Bulking', emoji: '💪' },
 }
 
-const RATE_OPTIONS = {
-  cut: [-0.5, -1.0, -1.5],
-  maintain: [0],
-  bulk: [0.25, 0.5],
-}
-
 function Row({ label, value, onClick }) {
   return (
     <button
@@ -62,17 +56,12 @@ function Row({ label, value, onClick }) {
   )
 }
 
-export default function Profile({ onNavigate }) {
+export default function Profile({ onNavigate, onOpenGoal }) {
   const { days, userState, dispatch, resetDemo } = useStore()
   const toast = useToast()
   const [sheet, setSheet] = useState(null)
   const [toggles, setToggles] = useState(() => Object.fromEntries(DATAPOINTS.map((d) => [d, true])))
   const goal = userState.goal ?? { phase: 'cut', goalWeight: 145, weeklyRateLb: -0.96 }
-  const [draft, setDraft] = useState(goal)
-  const openGoalEditor = () => {
-    setDraft(goal)
-    setSheet('goal')
-  }
 
   const trend = useMemo(() => {
     const t = trendWeightSeries(days)
@@ -104,14 +93,14 @@ export default function Profile({ onNavigate }) {
 
       <SectionTitle
         right={
-          <button onClick={() => openGoalEditor()} className="text-[12px] font-medium text-series-1">
-            Edit
+          <button onClick={onOpenGoal} className="text-[12px] font-medium text-series-1">
+            Strategy →
           </button>
         }
       >
         Goal
       </SectionTitle>
-      <Card onClick={() => openGoalEditor()}>
+      <Card onClick={onOpenGoal}>
         <div className="flex items-center justify-between">
           <p className="text-[14px] font-semibold text-ink">{PHASE_META[goal.phase].title}</p>
           <Chip tone="accent">{PHASE_META[goal.phase].chip}</Chip>
@@ -209,85 +198,6 @@ export default function Profile({ onNavigate }) {
           Reset demo data
         </button>
       </Card>
-
-      <Sheet open={sheet === 'goal'} onClose={() => setSheet(null)} title="Edit goal">
-        <div className="flex flex-col gap-2">
-          {Object.entries(PHASE_META).map(([phase, meta]) => (
-            <button
-              key={phase}
-              onClick={() =>
-                setDraft({
-                  phase,
-                  goalWeight: draft.goalWeight,
-                  weeklyRateLb: RATE_OPTIONS[phase].includes(draft.weeklyRateLb)
-                    ? draft.weeklyRateLb
-                    : RATE_OPTIONS[phase][RATE_OPTIONS[phase].length > 1 ? 1 : 0],
-                })
-              }
-              className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left ${
-                draft.phase === phase ? 'bg-series-1/15 ring-1 ring-series-1' : 'bg-surface-3'
-              }`}
-            >
-              <span className="text-[18px]">{meta.emoji}</span>
-              <span className="text-[14px] font-semibold text-ink">{meta.title}</span>
-            </button>
-          ))}
-        </div>
-        {draft.phase !== 'maintain' && (
-          <>
-            <p className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wider text-ink-3">
-              Rate
-            </p>
-            <div className="flex gap-1.5">
-              {RATE_OPTIONS[draft.phase].map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setDraft({ ...draft, weeklyRateLb: r })}
-                  className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold ${
-                    draft.weeklyRateLb === r ? 'bg-series-1 text-white' : 'bg-surface-3 text-ink-2'
-                  }`}
-                >
-                  {r > 0 ? '+' : ''}
-                  {r} lb/wk
-                </button>
-              ))}
-            </div>
-            <p className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wider text-ink-3">
-              Goal weight
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={() => setDraft({ ...draft, goalWeight: draft.goalWeight - 1 })}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-3 text-[17px] text-ink-2"
-              >
-                −
-              </button>
-              <span className="w-24 text-center text-[22px] font-bold text-ink">
-                {draft.goalWeight} <span className="text-[12px] font-normal text-ink-3">lb</span>
-              </span>
-              <button
-                onClick={() => setDraft({ ...draft, goalWeight: draft.goalWeight + 1 })}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-3 text-[17px] text-ink-2"
-              >
-                +
-              </button>
-            </div>
-          </>
-        )}
-        <button
-          onClick={() => {
-            dispatch({
-              type: 'setGoal',
-              goal: { ...draft, weeklyRateLb: draft.phase === 'maintain' ? 0 : draft.weeklyRateLb },
-            })
-            setSheet(null)
-            toast(`Goal updated — the calorie coach will re-plan from your next weigh-in`)
-          }}
-          className="mt-5 w-full rounded-xl bg-series-1 py-3 text-[14px] font-semibold text-white"
-        >
-          Save goal
-        </button>
-      </Sheet>
 
       <Sheet open={sheet === 'health'} onClose={() => setSheet(null)} title="Google Health Connect">
         <p className="mb-3 text-[13px]">
