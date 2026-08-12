@@ -155,6 +155,10 @@ function clamp01(x) {
   return Math.max(0, Math.min(1, x))
 }
 
+export function metricBaseline(days, idx, field, window = 28) {
+  return baseline(days, idx, field, window)
+}
+
 function baseline(days, idx, field, window = 28) {
   const vals = []
   for (let i = Math.max(0, idx - window); i < idx; i++) {
