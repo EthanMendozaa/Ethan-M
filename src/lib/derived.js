@@ -236,7 +236,7 @@ export function readiness(days, plannedSplit) {
       recovery: rec,
       tone: 'rest',
       title: `Recovery ${rec} — rest day`,
-      detail: 'No session scheduled. A walk and a full night of sleep set up tomorrow.',
+      detail: 'Nothing scheduled. Rest up.',
       hrvDeltaPct,
     }
   }
@@ -255,7 +255,7 @@ export function readiness(days, plannedSplit) {
       recovery: rec,
       tone: 'high',
       title: `Recovery ${rec} — green light for ${plannedSplit}`,
-      detail: 'Fully recovered. Optional +1 set on your first lift if the top set moves well.',
+      detail: 'Optional +1 set on your first lift.',
       hrvDeltaPct,
       volumeAdjustment: 0,
       bonusSet: true,
@@ -265,7 +265,7 @@ export function readiness(days, plannedSplit) {
     recovery: rec,
     tone: 'normal',
     title: `Recovery ${rec} — cleared for ${plannedSplit}`,
-    detail: 'Recovery is in the normal range. Run the session as programmed.',
+    detail: 'Run it as programmed.',
     hrvDeltaPct,
     volumeAdjustment: 0,
   }

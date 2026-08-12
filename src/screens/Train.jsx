@@ -431,9 +431,6 @@ export default function Train({ autoStart = false, onAutoStarted }) {
               ))}
           </div>
         ))}
-        <p className="border-t border-hairline py-2.5 text-[11px] leading-snug text-ink-3">
-          Readiness is projected from each muscle's recovery curve at session time.
-        </p>
       </Card>
 
       <SectionTitle right={<span className="text-[11px] text-ink-3">band = MEV–MRV target</span>}>
@@ -443,10 +440,6 @@ export default function Train({ autoStart = false, onAutoStarted }) {
         {volume.map((v) => (
           <VolumeRow key={v.muscle} v={v} />
         ))}
-        <p className="mt-2 border-t border-hairline pt-2 text-[11px] leading-snug text-ink-3">
-          Working sets per muscle group, last 7 days. The lighter band is your effective range —
-          below it under-stimulates, above it outpaces recovery.
-        </p>
       </Card>
 
       <SectionTitle>Program library</SectionTitle>

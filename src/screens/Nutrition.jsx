@@ -139,9 +139,7 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
             </LineChart>
           </ResponsiveContainer>
         </div>
-        <p className="mt-2 text-[11px] leading-snug text-ink-3">
-          Estimated from your last 14 days of weigh-ins and logged intake.
-        </p>
+        <p className="mt-2 text-[11px] text-ink-3">From 14 days of weigh-ins + intake</p>
       </Card>
 
       {checkIn && (

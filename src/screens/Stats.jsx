@@ -4,16 +4,12 @@ import {
   Line,
   BarChart,
   Bar,
-  ScatterChart,
-  Scatter,
   XAxis,
   YAxis,
-  ZAxis,
   CartesianGrid,
   Tooltip,
   ReferenceLine,
   ResponsiveContainer,
-  Legend,
   Cell,
 } from 'recharts'
 import { useStore } from '../lib/store'
@@ -55,10 +51,10 @@ const RANGES = [
 ]
 
 const TAG_META = {
-  'Sleep → Training': { icon: '😴', color: 'var(--color-series-1)' },
-  'Training → Nutrition': { icon: '🏋️', color: 'var(--color-series-2)' },
-  'Nutrition → Training': { icon: '🍗', color: 'var(--color-series-5)' },
-  'Nutrition → Recovery': { icon: '💚', color: 'var(--color-series-3)' },
+  'Sleep → Training': '😴',
+  'Training → Nutrition': '🏋️',
+  'Nutrition → Training': '🍗',
+  'Nutrition → Recovery': '💚',
 }
 
 function StatTile({ value, unit, label }) {
@@ -73,21 +69,12 @@ function StatTile({ value, unit, label }) {
   )
 }
 
-function ChartHeader({ value, label, tone = 'text-ink' }) {
-  return (
-    <div className="mb-2 flex items-baseline gap-2">
-      <span className={`text-[22px] font-bold leading-tight ${tone}`}>{value}</span>
-      <span className="text-[12px] text-ink-3">{label}</span>
-    </div>
-  )
-}
-
 export default function Stats({ onOpenWeight }) {
   const { days } = useStore()
-  const [sheet, setSheet] = useState(null)
+  const [sheet, setSheet] = useState(null) // 'unified' | { insight }
   const [range, setRange] = useState('8W')
+  const [lift, setLift] = useState('Barbell Bench Press')
   const rangeDays = RANGES.find((r) => r.label === range).days
-  const rangeWeeks = Math.floor(rangeDays / 7)
 
   // ---------- Overview ----------
   const unified = useMemo(() => unifiedScore(days), [days])
@@ -113,26 +100,51 @@ export default function Stats({ onOpenWeight }) {
 
   const insights = useMemo(() => allInsights(days), [days])
 
-  // ---------- Range-filtered chart data ----------
-  const weeklyData = useMemo(() => {
-    const weeks = weeklySetTotals(days).slice(-rangeWeeks)
-    const offset = weeklySetTotals(days).length - weeks.length
-    return weeks.map((w, i) => {
-      const endIdx = Math.min(
-        days.length - 1,
-        (offset + i + 1) * 7 - 1 + (days.length - weeklySetTotals(days).length * 7),
-      )
-      return { label: shortDate(w.key), sets: w.sets, tdee: tdeeAt(days, endIdx) }
-    })
-  }, [days, rangeWeeks])
+  // ---------- Strength ----------
+  const e1rmAll = useMemo(() => e1rmSeries(days), [days])
 
-  const tdeeShift = useMemo(() => {
-    const vals = weeklyData.map((w) => w.tdee).filter((v) => v != null)
-    if (vals.length < 2) return null
-    return Math.round((vals[vals.length - 1] - vals[0]) / 10) * 10
-  }, [weeklyData])
+  const liftData = useMemo(() => {
+    const startKey = days[Math.max(0, days.length - rangeDays)].key
+    return e1rmAll[lift]
+      .filter((pt) => pt.key >= startKey)
+      .map((pt) => ({ ...pt, label: shortDate(pt.key) }))
+  }, [days, e1rmAll, lift, rangeDays])
 
-  const hrvDeficit = useMemo(() => {
+  const liftStats = useMemo(() => {
+    const pts = e1rmAll[lift]
+    if (!pts.length) return null
+    let best = pts[0]
+    for (const pt of pts) if (pt.e1rm >= best.e1rm) best = pt
+    const start = pts.slice(0, 3).reduce((s, p) => s + p.e1rm, 0) / Math.min(3, pts.length)
+    return { best: best.e1rm, delta: Math.round(best.e1rm - start) }
+  }, [e1rmAll, lift])
+
+  const records = useMemo(() => {
+    return MAIN_LIFTS.map((l) => {
+      const pts = e1rmAll[l]
+      if (!pts.length) return null
+      let best = pts[0]
+      for (const pt of pts) if (pt.e1rm >= best.e1rm) best = pt
+      const start = pts.slice(0, 3).reduce((s, p) => s + p.e1rm, 0) / Math.min(3, pts.length)
+      return { lift: l, short: LIFT_SHORT[l], best: best.e1rm, date: best.key, delta: Math.round(best.e1rm - start) }
+    }).filter(Boolean)
+  }, [e1rmAll])
+
+  // ---------- Energy: first block vs last block ----------
+  const energy = useMemo(() => {
+    const weeks = weeklySetTotals(days)
+    const half = Math.floor(weeks.length / 2)
+    const mean = (arr) => Math.round(arr.reduce((s, w) => s + w.sets, 0) / arr.length)
+    return {
+      sets1: mean(weeks.slice(0, half)),
+      sets2: mean(weeks.slice(-half)),
+      tdee1: tdeeAt(days, Math.min(days.length - 1, half * 7)),
+      tdee2: tdeeAt(days, days.length - 1),
+    }
+  }, [days])
+
+  // ---------- Recovery: HRV by deficit depth (tertiles) ----------
+  const hrvBins = useMemo(() => {
     const rows = []
     for (let i = Math.max(20, days.length - rangeDays); i < days.length; i++) {
       const tdee = tdeeAt(days, i)
@@ -146,58 +158,32 @@ export default function Stats({ onOpenWeight }) {
         }
       }
       if (n < 5) continue
-      rows.push({ deficit: Math.round(tdee - sum / n), hrv: days[i].hrv })
+      rows.push({ deficit: tdee - sum / n, hrv: days[i].hrv })
     }
-    return rows
+    if (rows.length < 9) return null
+    const sorted = [...rows].sort((a, b) => a.deficit - b.deficit)
+    const third = Math.floor(sorted.length / 3)
+    const bin = (arr, label) => ({
+      label,
+      kcal: Math.round(arr.reduce((s, r) => s + r.deficit, 0) / arr.length / 10) * 10,
+      hrv: Math.round(arr.reduce((s, r) => s + r.hrv, 0) / arr.length),
+    })
+    return [
+      bin(sorted.slice(0, third), 'Small deficit'),
+      bin(sorted.slice(third, third * 2), 'Medium'),
+      bin(sorted.slice(-third), 'Deep deficit'),
+    ]
   }, [days, rangeDays])
 
-  const hrvGap = useMemo(() => {
-    if (hrvDeficit.length < 12) return null
-    const sorted = [...hrvDeficit].sort((a, b) => a.deficit - b.deficit)
-    const third = Math.floor(sorted.length / 3)
-    const mean = (arr) => arr.reduce((s, r) => s + r.hrv, 0) / arr.length
-    return Math.round(mean(sorted.slice(0, third)) - mean(sorted.slice(-third)))
-  }, [hrvDeficit])
-
-  const e1rmAll = useMemo(() => e1rmSeries(days), [days])
-
-  const e1rmData = useMemo(() => {
-    const startKey = days[Math.max(0, days.length - rangeDays)].key
-    const byKey = {}
-    for (const lift of MAIN_LIFTS) {
-      for (const pt of e1rmAll[lift]) {
-        if (pt.key < startKey) continue
-        ;(byKey[pt.key] ??= { key: pt.key, label: shortDate(pt.key) })[LIFT_SHORT[lift]] = pt.e1rm
-      }
-    }
-    return Object.values(byKey).sort((a, b) => (a.key < b.key ? -1 : 1))
-  }, [days, e1rmAll, rangeDays])
-
-  const records = useMemo(() => {
-    return MAIN_LIFTS.map((lift) => {
-      const pts = e1rmAll[lift]
-      if (!pts.length) return null
-      let best = pts[0]
-      for (const pt of pts) if (pt.e1rm >= best.e1rm) best = pt
-      const start = pts.slice(0, 3).reduce((s, p) => s + p.e1rm, 0) / Math.min(3, pts.length)
-      return {
-        lift,
-        short: LIFT_SHORT[lift],
-        best: best.e1rm,
-        date: best.key,
-        delta: Math.round(best.e1rm - start),
-      }
-    }).filter(Boolean)
-  }, [e1rmAll])
-
+  // ---------- Sleep: last 14 nights ----------
   const sleepData = useMemo(
     () =>
-      days.slice(-Math.min(rangeDays, 28)).map((d) => ({
-        label: shortDate(d.key),
+      days.slice(-14).map((d) => ({
+        label: keyToDate(d.key).toLocaleDateString('en-US', { weekday: 'narrow' }),
         hours: d.sleep.hours,
         short: d.sleep.hours < 6.5,
       })),
-    [days, rangeDays],
+    [days],
   )
   const shortNights = sleepData.filter((d) => d.short).length
 
@@ -212,6 +198,12 @@ export default function Stats({ onOpenWeight }) {
       bfSpark: bf.slice(-30),
     }
   }, [days])
+
+  const hrvScale = useMemo(() => {
+    if (!hrvBins) return null
+    const vals = hrvBins.map((b) => b.hrv)
+    return { min: Math.min(...vals) - 4, max: Math.max(...vals) + 4 }
+  }, [hrvBins])
 
   return (
     <div className="pt-2">
@@ -232,7 +224,7 @@ export default function Stats({ onOpenWeight }) {
         </div>
       </header>
 
-      {/* Momentum hero */}
+      {/* Momentum */}
       <Card onClick={() => setSheet('unified')} className="flex items-center gap-5 !p-5">
         <div className="relative flex items-center justify-center">
           <ScoreRing value={unified.score} color={band.color} size={96} stroke={8} />
@@ -265,51 +257,80 @@ export default function Stats({ onOpenWeight }) {
         </div>
       </Card>
 
-      {/* Lifetime tiles */}
       <div className="mt-3 flex gap-2.5">
         <StatTile value={lifetime.workouts} label="workouts" />
-        <StatTile value={lifetime.volume} unit="lb" label="total volume" />
-        <StatTile value={lifetime.hours} unit="h" label="under the bar" />
+        <StatTile value={lifetime.volume} unit="lb" label="volume" />
+        <StatTile value={lifetime.hours} unit="h" label="lifting" />
         <StatTile value={lifetime.streak} unit="d" label="streak" />
       </div>
 
-      {/* Insights */}
-      <SectionTitle>What your data is saying</SectionTitle>
-      <div className="flex flex-col gap-2">
-        {insights.map((ins) => {
-          const meta = TAG_META[ins.tag] ?? { icon: '💡', color: 'var(--color-series-1)' }
-          return (
-            <Card key={ins.id} className="flex gap-3 !p-4">
-              <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[18px]"
-                style={{ background: `color-mix(in srgb, ${meta.color} 14%, transparent)` }}
-              >
-                {meta.icon}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-3">
-                    {ins.tag}
-                  </span>
-                  <span className="shrink-0 text-[15px] font-bold" style={{ color: meta.color }}>
-                    {ins.stat}
-                  </span>
-                </div>
-                <h3 className="mt-0.5 text-[13.5px] font-semibold leading-snug text-ink">
-                  {ins.title}
-                </h3>
-                <p className="mt-1 text-[12px] leading-snug text-ink-2">{ins.detail}</p>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
+      {/* Insights — one line each, tap for the how */}
+      <SectionTitle>Insights</SectionTitle>
+      <Card className="!p-2">
+        {insights.map((ins) => (
+          <button
+            key={ins.id}
+            onClick={() => setSheet({ insight: ins })}
+            className="flex w-full items-center gap-3 border-b border-hairline px-2 py-3 text-left last:border-0"
+          >
+            <span className="text-[17px]">{TAG_META[ins.tag] ?? '💡'}</span>
+            <span className="flex-1 text-[13px] font-medium leading-snug text-ink">
+              {ins.title}
+            </span>
+            <span className="text-ink-3">›</span>
+          </button>
+        ))}
+      </Card>
 
       {/* Strength */}
       <SectionTitle>Strength</SectionTitle>
       <Card className="!p-5">
+        <div className="flex gap-1.5">
+          {MAIN_LIFTS.map((l) => (
+            <button
+              key={l}
+              onClick={() => setLift(l)}
+              className={`flex-1 rounded-lg py-2 text-[12px] font-semibold transition-colors ${
+                lift === l ? 'text-white' : 'bg-surface-3 text-ink-3'
+              }`}
+              style={lift === l ? { background: LIFT_COLORS[l] } : undefined}
+            >
+              {LIFT_SHORT[l]}
+            </button>
+          ))}
+        </div>
+        <div className="mt-4 flex items-baseline gap-2">
+          <span className="text-[30px] font-bold leading-none text-ink">{liftStats?.best}</span>
+          <span className="text-[12px] text-ink-3">lb e1RM</span>
+          {liftStats?.delta > 0 && (
+            <Chip tone="good" className="ml-1">
+              +{liftStats.delta} lb this block
+            </Chip>
+          )}
+        </div>
+        <div className="mt-2 h-36">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={liftData} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid {...GRID} />
+              <XAxis dataKey="label" {...AXIS} interval={Math.max(1, Math.floor(liftData.length / 3))} />
+              <YAxis {...AXIS} width={40} domain={['dataMin - 6', 'dataMax + 6']} />
+              <Tooltip content={<ChartTooltip formatter={(v) => `${v} lb`} />} />
+              <Line
+                type="monotone"
+                dataKey="e1rm"
+                name={LIFT_SHORT[lift]}
+                stroke={LIFT_COLORS[lift]}
+                strokeWidth={2}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+
+      <Card className="mt-2.5 !p-5">
         <div className="mb-1 flex items-center justify-between">
-          <p className="text-[13px] font-semibold text-ink">Records · estimated 1RM</p>
+          <p className="text-[13px] font-semibold text-ink">Records</p>
           <Chip tone="accent">{records.filter((r) => r.delta > 0).length} PRs this block</Chip>
         </div>
         {records.map((r) => (
@@ -317,9 +338,7 @@ export default function Stats({ onOpenWeight }) {
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: LIFT_COLORS[r.lift] }} />
             <span className="w-14 text-[13px] text-ink-2">{r.short}</span>
             <span className="text-[16px] font-bold text-ink">{r.best} lb</span>
-            {r.delta > 0 && (
-              <span className="text-[11px] font-semibold text-good">+{r.delta} lb</span>
-            )}
+            {r.delta > 0 && <span className="text-[11px] font-semibold text-good">+{r.delta}</span>}
             <span className="ml-auto text-[11px] text-ink-3">
               {keyToDate(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
@@ -327,119 +346,93 @@ export default function Stats({ onOpenWeight }) {
         ))}
       </Card>
 
-      <Card className="mt-2.5 !p-5">
-        <ChartHeader
-          value="Holding through the cut"
-          label={`e1RM · last ${range.toLowerCase()}`}
-        />
-        <div className="h-44">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={e1rmData} margin={{ top: 4, right: 6, left: 0, bottom: 0 }}>
-              <CartesianGrid {...GRID} />
-              <XAxis dataKey="label" {...AXIS} interval={Math.max(1, Math.floor(e1rmData.length / 3))} />
-              <YAxis {...AXIS} width={46} domain={['dataMin - 15', 'dataMax + 15']} />
-              <Tooltip content={<ChartTooltip formatter={(v) => `${v} lb`} />} />
-              <Legend
-                iconType="plainline"
-                formatter={(value) => (
-                  <span style={{ color: 'var(--color-ink-2)', fontSize: 11 }}>{value}</span>
-                )}
-              />
-              {MAIN_LIFTS.map((lift) => (
-                <Line
-                  key={lift}
-                  type="monotone"
-                  dataKey={LIFT_SHORT[lift]}
-                  name={LIFT_SHORT[lift]}
-                  stroke={LIFT_COLORS[lift]}
-                  strokeWidth={2}
-                  dot={false}
-                  connectNulls
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
-
-      {/* Energy */}
+      {/* Energy: block comparison, not a time series */}
       <SectionTitle>Training ↔ energy</SectionTitle>
       <Card className="!p-5">
-        <ChartHeader
-          value={tdeeShift != null ? `${tdeeShift >= 0 ? '+' : ''}${tdeeShift} kcal` : '—'}
-          label="expenditure change as volume ramped"
-          tone={tdeeShift >= 0 ? 'text-series-1' : 'text-ink'}
-        />
-        <p className="mb-1 text-[11px] font-medium text-ink-3">Weekly training sets</p>
-        <div className="h-20">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={weeklyData} margin={{ top: 2, right: 6, left: 0, bottom: 0 }}>
-              <CartesianGrid {...GRID} />
-              <XAxis dataKey="label" {...AXIS} hide />
-              <YAxis {...AXIS} width={40} domain={[0, 'dataMax + 10']} />
-              <Tooltip content={<ChartTooltip formatter={(v) => `${v} sets`} />} />
-              <Bar dataKey="sets" name="Sets" fill="var(--color-series-2)" radius={[4, 4, 0, 0]} maxBarSize={18} />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-x-3 gap-y-4">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-ink-3">
+            First 6 wks
+          </span>
+          <span />
+          <span className="text-[11px] font-medium uppercase tracking-wide text-ink-3">
+            Last 6 wks
+          </span>
+          <span />
+          <div>
+            <p className="text-[22px] font-bold text-ink">{energy.sets1}</p>
+            <p className="text-[10px] text-ink-3">sets / week</p>
+          </div>
+          <span className="text-[16px] text-ink-3">→</span>
+          <div>
+            <p className="text-[22px] font-bold text-ink">{energy.sets2}</p>
+            <p className="text-[10px] text-ink-3">sets / week</p>
+          </div>
+          <Chip tone="accent">
+            +{Math.round(((energy.sets2 - energy.sets1) / energy.sets1) * 100)}%
+          </Chip>
+          <div>
+            <p className="text-[22px] font-bold text-ink">{energy.tdee1?.toLocaleString()}</p>
+            <p className="text-[10px] text-ink-3">kcal burned / day</p>
+          </div>
+          <span className="text-[16px] text-ink-3">→</span>
+          <div>
+            <p className="text-[22px] font-bold text-ink">{energy.tdee2?.toLocaleString()}</p>
+            <p className="text-[10px] text-ink-3">kcal burned / day</p>
+          </div>
+          <Chip tone="good">+{energy.tdee2 - energy.tdee1}</Chip>
         </div>
-        <p className="mb-1 mt-2 text-[11px] font-medium text-ink-3">Estimated TDEE (kcal)</p>
-        <div className="h-20">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={weeklyData} margin={{ top: 2, right: 6, left: 0, bottom: 0 }}>
-              <CartesianGrid {...GRID} />
-              <XAxis dataKey="label" {...AXIS} interval={Math.max(1, Math.floor(weeklyData.length / 3))} />
-              <YAxis {...AXIS} width={46} domain={['dataMin - 40', 'dataMax + 40']} />
-              <Tooltip content={<ChartTooltip formatter={(v) => `${v?.toLocaleString()} kcal`} />} />
-              <Line type="monotone" dataKey="tdee" name="TDEE" stroke="var(--color-series-1)" strokeWidth={2} dot={false} connectNulls />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-        <p className="mt-2 text-[11px] leading-snug text-ink-3">
-          Same weeks, stacked — more training, more energy out, more food budget.
+        <p className="mt-4 border-t border-hairline pt-3 text-[12px] text-ink-2">
+          Train more → burn more → eat more.
         </p>
       </Card>
 
       {/* Recovery */}
       <SectionTitle>Recovery</SectionTitle>
-      <Card className="!p-5">
-        <ChartHeader
-          value={hrvGap != null ? `−${hrvGap} ms` : '—'}
-          label="HRV on deepest- vs shallowest-deficit days"
-        />
-        <div className="h-36">
-          <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 4, right: 6, left: 0, bottom: 0 }}>
-              <CartesianGrid {...GRID} />
-              <XAxis dataKey="deficit" name="7-day deficit" type="number" {...AXIS} domain={['dataMin - 40', 'dataMax + 40']} />
-              <YAxis dataKey="hrv" name="HRV" type="number" {...AXIS} width={40} domain={['dataMin - 4', 'dataMax + 4']} />
-              <ZAxis range={[26, 26]} />
-              <Tooltip
-                content={<ChartTooltip formatter={(v, key) => (key === 'deficit' ? `${v} kcal` : `${v} ms`)} />}
-              />
-              <Scatter data={hrvDeficit} fill="var(--color-series-1)" fillOpacity={0.6} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </div>
-        <p className="mt-1 text-[11px] leading-snug text-ink-3">
-          Each dot is a day — x: average 7-day deficit (kcal), y: morning HRV (ms).
-        </p>
-      </Card>
+      {hrvBins && hrvScale && (
+        <Card className="!p-5">
+          <p className="mb-4 text-[13px] font-semibold text-ink">
+            Morning HRV by deficit size
+          </p>
+          {hrvBins.map((b) => (
+            <div key={b.label} className="mb-4 last:mb-0">
+              <div className="flex items-baseline justify-between text-[12px]">
+                <span className="text-ink-2">
+                  {b.label} <span className="text-ink-3">(~{b.kcal} kcal)</span>
+                </span>
+                <span className="text-[15px] font-bold text-ink">{b.hrv} ms</span>
+              </div>
+              <div className="relative mt-1.5 h-2 rounded-full bg-surface-3">
+                <div
+                  className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-surface bg-series-1"
+                  style={{
+                    left: `calc(${((b.hrv - hrvScale.min) / (hrvScale.max - hrvScale.min)) * 100}% - 8px)`,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+          <p className="mt-4 border-t border-hairline pt-3 text-[12px] text-ink-2">
+            Cutting harder costs recovery.
+          </p>
+        </Card>
+      )}
 
       <Card className="mt-2.5 !p-5">
-        <ChartHeader
-          value={`${shortNights} short night${shortNights === 1 ? '' : 's'}`}
-          label={`under 6.5h · last ${Math.min(rangeDays, 28)} days`}
-          tone={shortNights > 5 ? 'text-serious' : 'text-ink'}
-        />
+        <div className="mb-1 flex items-baseline justify-between">
+          <p className="text-[13px] font-semibold text-ink">Sleep · last 14 nights</p>
+          <span className={`text-[12px] font-semibold ${shortNights > 2 ? 'text-serious' : 'text-ink-3'}`}>
+            {shortNights} under 6.5h
+          </span>
+        </div>
         <div className="h-28">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={sleepData} margin={{ top: 4, right: 6, left: 0, bottom: 0 }}>
+            <BarChart data={sleepData} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
               <CartesianGrid {...GRID} />
-              <XAxis dataKey="label" {...AXIS} interval={6} />
-              <YAxis {...AXIS} width={34} domain={[0, 10]} ticks={[0, 4, 8]} />
+              <XAxis dataKey="label" {...AXIS} interval={0} />
+              <YAxis {...AXIS} width={30} domain={[0, 10]} ticks={[0, 4, 8]} />
               <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(1)} h`} />} />
               <ReferenceLine y={6.5} stroke="var(--color-serious)" strokeWidth={1} />
-              <Bar dataKey="hours" name="Sleep" radius={[3, 3, 0, 0]} maxBarSize={9}>
+              <Bar dataKey="hours" name="Sleep" radius={[4, 4, 0, 0]} maxBarSize={16}>
                 {sleepData.map((d, i) => (
                   <Cell key={i} fill={d.short ? 'var(--color-serious)' : 'var(--color-series-1)'} />
                 ))}
@@ -447,12 +440,12 @@ export default function Stats({ onOpenWeight }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="mt-1 flex items-center gap-4 text-[11px] text-ink-3">
+        <div className="mt-1.5 flex items-center gap-4 text-[11px] text-ink-3">
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-series-1" /> ≥ 6.5h
+            <span className="h-1.5 w-1.5 rounded-full bg-serious" /> short night
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-serious" /> short night (hits next-day lifts)
+            <span className="h-0.5 w-3 bg-serious" /> 6.5h line
           </span>
         </div>
       </Card>
@@ -467,9 +460,7 @@ export default function Stats({ onOpenWeight }) {
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-[14px] font-semibold text-ink-2">{body.bfNow?.toFixed(1)}%</span>
-            <span className="text-[11px] text-ink-3">
-              body fat · was {body.bfStart?.toFixed(1)}%
-            </span>
+            <span className="text-[11px] text-ink-3">body fat · was {body.bfStart?.toFixed(1)}%</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5">
@@ -481,10 +472,21 @@ export default function Stats({ onOpenWeight }) {
 
       <Sheet open={sheet === 'unified'} onClose={() => setSheet(null)} title="How Momentum works">
         <p>
-          Momentum blends 28-day training consistency ({unified.consistency}, weight 40%),
-          protein-target adherence ({unified.adherence}, 30%) and today's recovery (
-          {unified.recovery}, 30%) into one number — one input from each subsystem of the app.
+          40% training consistency ({unified.consistency}) + 30% protein adherence (
+          {unified.adherence}) + 30% today's recovery ({unified.recovery}), over the last 28 days.
         </p>
+      </Sheet>
+      <Sheet
+        open={sheet?.insight != null}
+        onClose={() => setSheet(null)}
+        title={sheet?.insight?.tag}
+      >
+        {sheet?.insight && (
+          <>
+            <p className="text-[15px] font-semibold text-ink">{sheet.insight.title}</p>
+            <p className="mt-2">{sheet.insight.detail}</p>
+          </>
+        )}
       </Sheet>
     </div>
   )

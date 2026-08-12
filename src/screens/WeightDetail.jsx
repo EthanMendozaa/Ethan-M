@@ -146,11 +146,9 @@ export default function WeightDetail({ onClose }) {
             </span>
           </div>
           {journey.goalKey && (
-            <p className="mt-3 border-t border-hairline pt-3 text-[12px] leading-snug text-ink-2">
-              At your current rate ({journey.ratePerWeek} lb/wk) you'll reach{' '}
-              {journey.goalLb.toFixed(0)} lb around{' '}
-              <span className="font-semibold text-ink">{longDate(journey.goalKey)}</span> — then
-              the lean bulk toward 160 begins.
+            <p className="mt-3 border-t border-hairline pt-3 text-[12px] text-ink-2">
+              On pace for {journey.goalLb.toFixed(0)} lb by{' '}
+              <span className="font-semibold text-ink">{longDate(journey.goalKey)}</span>
             </p>
           )}
         </Card>
@@ -275,10 +273,7 @@ export default function WeightDetail({ onClose }) {
         <Card className="mb-6 flex items-center justify-between !px-5 !py-4 shadow-lg shadow-black/25 ring-1 ring-white/5">
           <div className="flex items-center gap-3">
             <span className="text-[22px]">🔥</span>
-            <div>
-              <p className="text-[14px] font-semibold text-ink">{streak}-day weigh-in streak</p>
-              <p className="text-[11px] text-ink-3">Daily data keeps your TDEE estimate sharp</p>
-            </div>
+            <p className="text-[14px] font-semibold text-ink">{streak}-day weigh-in streak</p>
           </div>
           <Chip tone="accent">+5 XP/day</Chip>
         </Card>
