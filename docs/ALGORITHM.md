@@ -143,6 +143,39 @@ TDEE = mean(intake, 14d) − Δ(trendWeight, 14d)/day × 3500
   at the weekly check-in, clamped to ±100 kcal, so the plan never whipsaws
   on noise.
 
+## 7. Adaptive calorie coaching
+
+The daily calorie target updates automatically from weigh-ins:
+
+```
+idealTarget = TDEE + targetRate × 3500/7
+targetRate  = −0.65% bodyweight / week while cutting
+```
+
+The suggestion anchors to the **measured expenditure** (§6), not to the
+previous target — as TDEE drifts with training volume or adaptive
+thermogenesis, the target follows without manual recalibration. A 0.5-1%
+BW/week loss rate preserves lean mass and performance in trained athletes
+(Helms 2014; Garthe 2011); we aim at the middle.
+
+Guardrails, in priority order:
+
+1. **Data gate** — no suggestion until ≥10 weigh-ins in the last 14 days.
+2. **RMR floor** — never prescribe below Mifflin-St Jeor resting
+   expenditure (Mifflin 1990).
+3. **Rate ceiling** — losing faster than 1.25% BW/week forces calories up
+   regardless of plan (Garthe 2011).
+4. **Step clamp** — ±150 kcal per review, so estimate noise never whipsaws
+   the plan.
+5. **Diet break** — 6+ weeks of continuous deficit with HRV below its band
+   triggers a maintenance-week suggestion; intermittent dieting matched
+   continuous for fat loss with better lean-mass outcomes in trained
+   adults (Peos 2021).
+
+Suggestions are surfaced with an explicit **Apply** step — the engine never
+silently changes what the user is aiming at — and each carries its
+rationale chain like every other engine output.
+
 ## Limitations (read before trusting it further)
 
 - e1RM formulas are population averages; individual rep-max relationships
@@ -164,6 +197,7 @@ TDEE = mean(intake, 14d) − Δ(trendWeight, 14d)/day × 3500
 - Craven J et al. (2022). *Effects of acute sleep loss on physical performance: a systematic and meta-analytical review.* Sports Med 52.
 - Damas F et al. (2016). *Resistance training-induced changes in integrated myofibrillar protein synthesis.* J Physiol 594(18).
 - Epley B (1985). *Poundage chart.* Boyd Epley Workout, Lincoln NE.
+- Garthe I et al. (2011). *Effect of two different weight-loss rates on body composition and strength/power performance in elite athletes.* Int J Sport Nutr Exerc Metab 21(2).
 - Hall KD (2008). *What is the required energy deficit per unit weight loss?* Int J Obes 32(3).
 - Helms ER et al. (2014). *Evidence-based recommendations for natural bodybuilding contest preparation.* J Int Soc Sports Nutr 11:20.
 - Helms ER et al. (2016). *Application of the repetitions-in-reserve-based RPE scale for resistance training.* Strength Cond J 38(4).
@@ -173,6 +207,8 @@ TDEE = mean(intake, 14d) − Δ(trendWeight, 14d)/day × 3500
 - Iversen VM et al. (2021). *No time to lift? Designing time-efficient training programs.* Sports Med 51(10).
 - Mangine GT et al. (2015). *The effect of training volume and intensity on improvements in muscular strength and size in resistance-trained men.* Physiol Rep 3(8).
 - Meeusen R et al. (2013). *Prevention, diagnosis and treatment of the overtraining syndrome — ECSS/ACSM consensus statement.* Med Sci Sports Exerc 45(1).
+- Mifflin MD et al. (1990). *A new predictive equation for resting energy expenditure in healthy individuals.* Am J Clin Nutr 51(2).
+- Peos JJ et al. (2021). *Continuous versus intermittent dieting in resistance-trained adults: the ICECAP trial.* Med Sci Sports Exerc 53(8).
 - Murphy C, Koehler K (2022). *Energy deficiency impairs resistance training gains in lean mass but not strength.* Scand J Med Sci Sports 32(1).
 - Refalo MC et al. (2023). *Influence of resistance training proximity-to-failure on skeletal muscle hypertrophy: a systematic review with meta-analysis.* Sports Med 53(3).
 - Schoenfeld BJ et al. (2016). *Longer interset rest periods enhance muscle strength and hypertrophy in resistance-trained men.* J Strength Cond Res 30(7).

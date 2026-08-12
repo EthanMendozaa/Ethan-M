@@ -5,7 +5,7 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import { useStore } from '../lib/store'
-import { weeklyCheckIn, macroTargets } from '../lib/derived'
+import { macroTargets } from '../lib/derived'
 import {
   FOOD_DB,
   CATEGORIES,
@@ -447,17 +447,17 @@ const TITLES = {
 }
 
 export default function FoodFlows({ view, onClose }) {
-  const { days, today, todayKey, dispatch } = useStore()
+  const { days, today, todayKey, dispatch, userState } = useStore()
   const toast = useToast()
   const [current, setCurrent] = useState(view)
   const [detailFood, setDetailFood] = useState(null)
   const [cameFrom, setCameFrom] = useState('search')
   useEffect(() => setCurrent(view), [view])
 
-  const targets = useMemo(() => {
-    const checkIn = weeklyCheckIn(days)
-    return macroTargets(checkIn?.newTarget ?? 2050)
-  }, [days])
+  const targets = useMemo(
+    () => macroTargets(userState.calorieTarget ?? 2050),
+    [userState.calorieTarget],
+  )
 
   const remaining = useMemo(
     () => ({

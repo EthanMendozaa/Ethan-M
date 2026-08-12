@@ -14,10 +14,10 @@ import {
   trendWeightSeries,
   tdeeSeries,
   tdeeAt,
-  weeklyCheckIn,
   macroTargets,
   weightJourney,
 } from '../lib/derived'
+import { calorieCoach, REFERENCES } from '../lib/engine'
 import { Card, Chip, SectionTitle, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
 import Sparkline from '../components/Sparkline'
@@ -52,13 +52,14 @@ const SLOT_LABELS = {
 }
 
 export default function Nutrition({ onOpenWeight, onAddFood }) {
-  const { days, today, todayKey, dispatch } = useStore()
+  const { days, today, todayKey, dispatch, userState } = useStore()
   const toast = useToast()
   const [sheet, setSheet] = useState(null)
   const [editItem, setEditItem] = useState(null) // { uid, name, base, mult, slot }
 
-  const checkIn = useMemo(() => weeklyCheckIn(days), [days])
-  const targets = useMemo(() => macroTargets(checkIn?.newTarget ?? 2050), [checkIn])
+  const calorieTarget = userState.calorieTarget ?? 2050
+  const coach = useMemo(() => calorieCoach(days, calorieTarget), [days, calorieTarget])
+  const targets = useMemo(() => macroTargets(calorieTarget), [calorieTarget])
   const tdee = useMemo(() => tdeeAt(days, days.length - 1), [days])
 
   const tdeeData = useMemo(
@@ -117,7 +118,7 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
         <div className="flex items-baseline gap-2">
           <span className="text-[26px] font-bold text-ink">{tdee?.toLocaleString()}</span>
           <span className="text-[13px] text-ink-3">kcal / day</span>
-          {checkIn && tdee > checkIn.oldTarget + 300 && (
+          {tdee > calorieTarget + 300 && (
             <span className="text-[13px] font-semibold text-series-1">↗</span>
           )}
         </div>
@@ -142,34 +143,57 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
         <p className="mt-2 text-[11px] text-ink-3">From 14 days of weigh-ins + intake</p>
       </Card>
 
-      {checkIn && (
-        <>
-          <SectionTitle>Weekly check-in</SectionTitle>
-          <Card className="border border-series-1/20">
-            <div className="flex items-center justify-between">
-              <Chip tone="accent">Coaching update</Chip>
-              <span className="text-[11px] text-ink-3">applies Monday</span>
-            </div>
-            <div className="mt-3 flex items-center gap-3">
-              <div className="text-center">
-                <p className="text-[11px] text-ink-3">Old target</p>
-                <p className="text-[20px] font-semibold text-ink-2 line-through decoration-ink-3/60">
-                  {checkIn.oldTarget.toLocaleString()}
-                </p>
-              </div>
-              <span className="text-ink-3">→</span>
-              <div className="text-center">
-                <p className="text-[11px] text-ink-3">New target</p>
-                <p className="text-[20px] font-bold text-ink">{checkIn.newTarget.toLocaleString()}</p>
-              </div>
-              <p className="ml-2 flex-1 text-[12px] leading-snug text-ink-2">
-                Trending {checkIn.observedRate} lb/wk vs {checkIn.targetRate} target →{' '}
-                {checkIn.adjustment >= 0 ? '+' : ''}
-                {checkIn.adjustment} kcal
-              </p>
-            </div>
-          </Card>
-        </>
+      <SectionTitle>Calorie coach</SectionTitle>
+      {coach.status === 'suggest' ? (
+        <Card className="border border-series-1/20">
+          <div className="flex items-center justify-between">
+            <Chip tone="accent">Suggested update</Chip>
+            <button onClick={() => setSheet('coach')} className="text-[12px] font-medium text-series-1">
+              Why?
+            </button>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <p className="text-[24px] font-bold text-ink-2 line-through decoration-ink-3/60">
+              {calorieTarget.toLocaleString()}
+            </p>
+            <span className="text-ink-3">→</span>
+            <p className="text-[24px] font-bold text-ink">{coach.suggested.toLocaleString()}</p>
+            <Chip tone={coach.delta > 0 ? 'good' : 'warning'}>
+              {coach.delta > 0 ? '+' : ''}
+              {coach.delta} kcal
+            </Chip>
+          </div>
+          <p className="mt-1.5 text-[12px] text-ink-3">
+            {coach.observedRate} lb/wk vs {coach.targetRate} target
+          </p>
+          {coach.dietBreak && (
+            <p className="mt-2 rounded-lg bg-warning/10 px-3 py-2 text-[12px] text-warning">
+              Or: diet-break week at ~{coach.dietBreak.toLocaleString()} kcal
+            </p>
+          )}
+          <button
+            onClick={() => {
+              dispatch({ type: 'setCalorieTarget', target: coach.suggested })
+              toast(`Target updated to ${coach.suggested.toLocaleString()} kcal`)
+            }}
+            className="mt-3 w-full rounded-xl bg-series-1 py-3 text-[14px] font-semibold text-white active:scale-[0.98] transition-transform"
+          >
+            Apply {coach.suggested.toLocaleString()} kcal
+          </button>
+        </Card>
+      ) : (
+        <Card className="flex items-center justify-between py-3">
+          <span className="text-[13px] text-ink-2">
+            {coach.status === 'collecting'
+              ? `Need ${coach.needed} more weigh-ins to calibrate`
+              : `On plan — ${calorieTarget.toLocaleString()} kcal holds`}
+          </span>
+          {coach.status !== 'collecting' && (
+            <button onClick={() => setSheet('coach')} className="text-[12px] font-medium text-series-1">
+              Why?
+            </button>
+          )}
+        </Card>
       )}
 
       <SectionTitle>Weight</SectionTitle>
@@ -345,6 +369,24 @@ export default function Nutrition({ onOpenWeight, onAddFood }) {
                 Remove
               </button>
             </div>
+          </div>
+        )}
+      </Sheet>
+
+      <Sheet open={sheet === 'coach'} onClose={() => setSheet(null)} title="How this suggestion works">
+        {coach.rationale && (
+          <div className="flex flex-col gap-2">
+            {coach.rationale.map((r, i) => (
+              <div key={i} className="rounded-xl bg-surface-3 px-3.5 py-2.5">
+                <p className="text-[13px] leading-snug text-ink">{r.text}</p>
+                {REFERENCES[r.ref] && (
+                  <p className="mt-1 text-[10px] leading-snug text-ink-3">{REFERENCES[r.ref]}</p>
+                )}
+              </div>
+            ))}
+            <p className="mt-1 text-[10px] text-ink-3">
+              Recomputed after every weigh-in · methodology: docs/ALGORITHM.md
+            </p>
           </div>
         )}
       </Sheet>

@@ -13,7 +13,7 @@
 // close to failure, full recovery between them, progression through load —
 // not through accumulating half-effort volume.
 
-import { tdeeAt, muscleRecoveryState, weeklyVolume, e1rmSeries } from './derived'
+import { tdeeAt, muscleRecoveryState, weeklyVolume, e1rmSeries, trendWeightSeries } from './derived'
 import { EXERCISES, VOLUME_BAND, MAIN_LIFTS } from './programs'
 
 export const REFERENCES = {
@@ -52,6 +52,14 @@ export const REFERENCES = {
     'Schoenfeld BJ et al. (2016). Longer interset rest periods enhance muscle strength and hypertrophy in resistance-trained men. J Strength Cond Res 30(7).',
   meeusen2013:
     'Meeusen R et al. (2013). Prevention, diagnosis and treatment of the overtraining syndrome — ECSS/ACSM consensus statement. Med Sci Sports Exerc 45(1).',
+  garthe2011:
+    'Garthe I et al. (2011). Effect of two different weight-loss rates on body composition and strength/power performance in elite athletes. Int J Sport Nutr Exerc Metab 21(2).',
+  mifflin1990:
+    'Mifflin MD et al. (1990). A new predictive equation for resting energy expenditure in healthy individuals. Am J Clin Nutr 51(2).',
+  peos2021:
+    'Peos JJ et al. (2021). Continuous versus intermittent dieting in resistance-trained adults: the ICECAP trial. Med Sci Sports Exerc 53(8).',
+  wishnofsky1958:
+    'Wishnofsky M (1958). Caloric equivalents of gained or lost weight. Am J Clin Nutr 6(5).',
 }
 
 // Rest between hard sets: longer rest preserves output on the next set
@@ -303,4 +311,97 @@ function fmtH(hours) {
   const h = Math.floor(hours)
   const m = Math.round((hours - h) * 60)
   return `${h}h ${String(m).padStart(2, '0')}m`
+}
+
+// ── Adaptive calorie coach ───────────────────────────────────────────────
+// Suggests updates to the daily calorie target from weigh-ins. Anchored to
+// the measured TDEE (energy balance from intake + trend-weight change), not
+// to the previous target, so it self-corrects as expenditure drifts.
+//
+//   idealTarget = TDEE + targetRate × 3500/7
+//   targetRate  = −0.65% bodyweight/week while cutting (Helms 2014:
+//                 0.5–1%/wk preserves lean mass; Garthe 2011: slower
+//                 rates protected LBM and performance)
+// Guardrails, in priority order:
+//   1. never below estimated RMR (Mifflin 1990)
+//   2. losing faster than 1.25% BW/wk forces calories UP regardless
+//   3. steps clamped to ±150 kcal per review so TDEE noise never whipsaws
+//   4. 6+ weeks of continuous deficit with suppressed HRV → suggest a
+//      maintenance diet break (Peos 2021; Helms 2014)
+
+const PROFILE = { heightCm: 178, age: 27, sex: 'm' } // demo persona
+
+export function estimateRMR(weightLb, { heightCm, age, sex } = PROFILE) {
+  const kg = weightLb * 0.4536
+  return Math.round(10 * kg + 6.25 * heightCm - 5 * age + (sex === 'm' ? 5 : -161))
+}
+
+export function calorieCoach(days, currentTarget) {
+  const trend = trendWeightSeries(days).filter((t) => t.trend != null)
+  const weighIns14 = days.slice(-14).filter((d) => d.weightLb != null).length
+  const tdee = tdeeAt(days, days.length - 1)
+  if (trend.length < 15 || weighIns14 < 10 || tdee == null) {
+    return { status: 'collecting', needed: 10 - weighIns14 }
+  }
+
+  const bw = trend[trend.length - 1].trend
+  const span = Math.min(14, trend.length - 1)
+  const observedRate =
+    Math.round((((trend[trend.length - 1].trend - trend[trend.length - 1 - span].trend) / span) * 7) * 100) / 100
+  const targetRate = -Math.round(0.0065 * bw * 100) / 100 // lb/wk
+  const rationale = [
+    {
+      text: `Expenditure ${tdee.toLocaleString()} kcal/day from your last 14 days of weigh-ins + intake`,
+      ref: 'wishnofsky1958',
+    },
+    {
+      text: `Trending ${observedRate} lb/wk vs ${targetRate} target (0.65% of ${bw.toFixed(0)} lb)`,
+      ref: 'helms2014',
+    },
+  ]
+
+  const ideal = Math.round((tdee + (targetRate * 3500) / 7) / 10) * 10
+  let suggested = Math.max(currentTarget - 150, Math.min(currentTarget + 150, ideal))
+  if (suggested !== ideal) {
+    rationale.push({ text: `Step clamped to ±150 kcal per review to absorb estimate noise`, ref: 'helms2014' })
+  }
+
+  const rmr = estimateRMR(bw)
+  if (suggested < rmr) {
+    suggested = rmr
+    rationale.push({ text: `Floored at estimated resting expenditure (${rmr} kcal)`, ref: 'mifflin1990' })
+  }
+
+  if (observedRate < -0.0125 * bw) {
+    suggested = Math.max(suggested, currentTarget + 100)
+    rationale.push({
+      text: `Losing faster than 1.25% BW/wk — raising intake to protect lean mass`,
+      ref: 'garthe2011',
+    })
+  }
+
+  // Diet-break check: long continuous deficit + suppressed HRV
+  const hrv = hrvReadiness(days)
+  const sixWeeksAgo = trend[Math.max(0, trend.length - 43)].trend
+  const longDeficit = bw < sixWeeksAgo - 3
+  let dietBreak = null
+  if (longDeficit && hrv?.state === 'low') {
+    dietBreak = Math.round(tdee / 10) * 10
+    rationale.push({
+      text: `6+ weeks in a deficit with HRV below band — a week at maintenance (~${dietBreak.toLocaleString()} kcal) costs little and restores training quality`,
+      ref: 'peos2021',
+    })
+  }
+
+  const delta = suggested - currentTarget
+  return {
+    status: Math.abs(delta) >= 40 ? 'suggest' : 'on-plan',
+    suggested,
+    delta,
+    tdee,
+    observedRate,
+    targetRate,
+    dietBreak,
+    rationale,
+  }
 }

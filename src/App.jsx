@@ -12,6 +12,14 @@ import Train from './screens/Train'
 import Stats from './screens/Stats'
 import Profile from './screens/Profile'
 import WeightDetail from './screens/WeightDetail'
+import Onboarding from './screens/Onboarding'
+import { useStore } from './lib/store'
+
+function AppShell(props) {
+  const { userState } = useStore()
+  if (!userState.onboarded) return <Onboarding />
+  return props.children
+}
 
 export default function App() {
   const [tab, setTab] = useState('today')
@@ -40,6 +48,7 @@ export default function App() {
     <StoreProvider>
       <PhoneFrame>
         <ToastProvider>
+          <AppShell>
           {/* Sheets/toasts position against the phone frame, so main stays non-positioned */}
           <main className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
             {tab === 'today' && (
@@ -62,6 +71,7 @@ export default function App() {
             onAction={handleQuickAction}
           />
           <FoodFlows view={foodView} onClose={() => setFoodView(null)} />
+          </AppShell>
         </ToastProvider>
       </PhoneFrame>
     </StoreProvider>

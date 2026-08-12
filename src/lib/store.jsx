@@ -15,8 +15,11 @@ const defaultUserState = {
   activities: {}, // { 'YYYY-MM-DD': [{ type, minutes, kcal }] }
   completedSession: null, // { key, session } — today's logged workout
   bonusXP: 0,
+  calorieTarget: 2050, // updated when the user applies a coach suggestion
   activeProgramId: 'arnold-split',
   settings: { units: 'lb', notifications: true },
+  onboarded: false,
+  profile: null,
 }
 
 const SLOT_ORDER = ['breakfast', 'lunch', 'dinner', 'snack', 'logged']
@@ -138,6 +141,16 @@ function reducer(state, action) {
         ...state,
         completedSession: { key: action.key, session: action.session },
         bonusXP: state.bonusXP + (action.bonusXP ?? 0),
+      }
+    case 'setCalorieTarget':
+      return { ...state, calorieTarget: action.target }
+    case 'completeOnboarding':
+      return {
+        ...state,
+        onboarded: true,
+        profile: action.profile,
+        calorieTarget: action.profile.calorieTarget ?? state.calorieTarget,
+        activeProgramId: action.profile.programId ?? state.activeProgramId,
       }
     case 'setProgram':
       return { ...state, activeProgramId: action.programId }

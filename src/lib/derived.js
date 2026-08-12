@@ -119,28 +119,7 @@ export function tdeeSeries(days) {
   return out
 }
 
-// Weekly coaching check-in: compare observed rate vs target, adjust kcal target.
-export function weeklyCheckIn(days) {
-  const trend = trendWeightSeries(days)
-  const valid = trend.filter((t) => t.trend != null)
-  if (valid.length < 15) return null
-  const now = valid[valid.length - 1].trend
-  const weekAgo = valid[Math.max(0, valid.length - 8)].trend
-  const observedRate = Math.round((now - weekAgo) * 100) / 100 // lb/week, negative = loss
-  const targetRate = -1.0
-  const gap = observedRate - targetRate // negative → losing faster than planned → eat more
-  const adjustment = Math.max(-100, Math.min(100, Math.round((-gap * 3500) / 7 / 10) * 10))
-  const tdee = tdeeAt(days, days.length - 1) ?? 2500
-  const oldTarget = 2050
-  return {
-    observedRate,
-    targetRate,
-    oldTarget,
-    newTarget: oldTarget + adjustment,
-    adjustment,
-    tdee,
-  }
-}
+// (Calorie target updates now come from engine.calorieCoach.)
 
 export function macroTargets(kcalTarget) {
   const protein = 160
