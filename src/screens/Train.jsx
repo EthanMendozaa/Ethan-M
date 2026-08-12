@@ -14,6 +14,7 @@ import {
   e1rmSeries,
 } from '../lib/derived'
 import { PROGRAMS, EXERCISES, MUSCLE_GROUPS } from '../lib/programs'
+import { dayReadiness, prescribeExercise } from '../lib/engine'
 import { weekday, shortDate } from '../lib/dates'
 import { Card, Chip, SectionTitle, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
@@ -59,18 +60,27 @@ function VolumeRow({ v }) {
   )
 }
 
-function buildLoggerState(plannedSession, ready) {
+function buildLoggerState(plannedSession, ready, days) {
   const cut = ready.volumeAdjustment === -0.2
-  return plannedSession.exercises.map((ex, idx) => {
+  const primaries = [...new Set(plannedSession.exercises.map((ex) => ex.muscles[0]))]
+  const dayRx = dayReadiness(days, primaries)
+  const exercises = plannedSession.exercises.map((ex, idx) => {
+    const target = prescribeExercise(days, ex.name, ex.targetReps, dayRx)
+    const inc = ex.increment || 2.5
     const sets = []
     let n = ex.targetSets
     if (cut) n = Math.max(1, Math.round(n * 0.8))
     if (ready.bonusSet && idx === 0) n += 1
     for (let s = 0; s < n; s++) {
-      const ghost = ex.prevSets?.[Math.min(s, (ex.prevSets?.length ?? 1) - 1)]
+      const ghost = ex.prevSets?.[s]
       sets.push({
-        reps: ghost?.reps ?? ex.targetReps,
-        load: ghost?.load ?? 0,
+        // Top set comes from the engine's prescription; back-offs follow
+        // last session's pattern, falling back to a 4%-per-set taper.
+        reps: s === 0 ? target.reps : (ghost?.reps ?? target.reps),
+        load:
+          s === 0
+            ? target.load
+            : (ghost?.load ?? Math.max(0, Math.round((target.load * (1 - 0.04 * s)) / inc) * inc)),
         rir: ghost?.rir ?? 2,
         done: false,
         bonus: ready.bonusSet && idx === 0 && s === n - 1,
@@ -80,11 +90,13 @@ function buildLoggerState(plannedSession, ready) {
       name: ex.name,
       muscles: ex.muscles,
       superset: ex.superset,
-      increment: ex.increment || 2.5,
+      increment: inc,
       sets,
       ghost: ex.prevSets,
+      target,
     }
   })
+  return { exercises, dayRx }
 }
 
 export default function Train({ autoStart = false, onAutoStarted }) {
@@ -92,6 +104,7 @@ export default function Train({ autoStart = false, onAutoStarted }) {
   const toast = useToast()
   const [view, setView] = useState('home') // home | active | summary
   const [logger, setLogger] = useState(null)
+  const [dayRx, setDayRx] = useState(null)
   const [startedAt, setStartedAt] = useState(null)
   const [summary, setSummary] = useState(null)
   const [programSheet, setProgramSheet] = useState(null)
@@ -113,7 +126,9 @@ export default function Train({ autoStart = false, onAutoStarted }) {
 
   function startSession() {
     if (!logger) {
-      setLogger(buildLoggerState(plannedSession, ready))
+      const built = buildLoggerState(plannedSession, ready, days)
+      setLogger(built.exercises)
+      setDayRx(built.dayRx)
       setStartedAt(Date.now())
     }
     setView('active')
@@ -161,6 +176,7 @@ export default function Train({ autoStart = false, onAutoStarted }) {
     dispatch({ type: 'completeWorkout', key: todayKey, session, bonusXP: prXP })
     setSummary({ ...stats, prs, prXP, minutes, dayName: session.dayName })
     setLogger(null)
+    setDayRx(null)
     setStartedAt(null)
     setView('summary')
   }
@@ -554,6 +570,7 @@ export default function Train({ autoStart = false, onAutoStarted }) {
           setLogger={setLogger}
           planned={plannedSession}
           ready={ready}
+          dayRx={dayRx}
           startedAt={startedAt}
           onExit={() => setView('home')}
           onFinish={finishSession}

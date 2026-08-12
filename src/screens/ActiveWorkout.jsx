@@ -7,6 +7,7 @@ import { Chip, useToast } from '../components/ui'
 import Sheet from '../components/Sheet'
 import PlateCalculator from '../components/PlateCalculator'
 import { alternativesFor } from '../lib/programs'
+import { REFERENCES } from '../lib/engine'
 
 function roundTo(load, inc) {
   const step = inc || 2.5
@@ -48,6 +49,7 @@ export default function ActiveWorkout({
   setLogger,
   planned,
   ready,
+  dayRx,
   startedAt,
   onExit,
   onFinish,
@@ -57,6 +59,7 @@ export default function ActiveWorkout({
   const [rest, setRest] = useState(null) // { until, total }
   const [plateSheet, setPlateSheet] = useState(null)
   const [swapSheet, setSwapSheet] = useState(null) // exercise index
+  const [whySheet, setWhySheet] = useState(null) // exercise index
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
@@ -230,6 +233,34 @@ export default function ActiveWorkout({
                   </p>
                 )}
 
+                {/* Engine prescription */}
+                {ex.target && ex.target.load > 0 && (
+                  <div className="mt-2.5 flex items-center justify-between rounded-xl bg-series-1/10 px-3.5 py-2.5">
+                    <span className="text-[13px] font-semibold text-series-1">
+                      🎯 {ex.target.load} × {ex.target.reps} @RIR {ex.target.rir}
+                    </span>
+                    <span className="flex items-center gap-2.5">
+                      <span
+                        className={`text-[11px] font-semibold ${
+                          ex.target.change.startsWith('+')
+                            ? 'text-good'
+                            : ex.target.change.startsWith('−')
+                              ? 'text-serious'
+                              : 'text-ink-3'
+                        }`}
+                      >
+                        {ex.target.change}
+                      </span>
+                      <button
+                        onClick={() => setWhySheet(exIdx)}
+                        className="text-[11px] font-medium text-ink-3 underline decoration-ink-3/40 underline-offset-2"
+                      >
+                        Why?
+                      </button>
+                    </span>
+                  </div>
+                )}
+
                 {/* Column labels */}
                 <div className="mt-4 flex items-center gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-ink-3">
                   <span className="w-7">Set</span>
@@ -352,6 +383,31 @@ export default function ActiveWorkout({
 
       <Sheet open={plateSheet != null} onClose={() => setPlateSheet(null)}>
         {plateSheet != null && <PlateCalculator initialLoad={plateSheet} />}
+      </Sheet>
+
+      {/* Why this target — the engine's rationale with sources */}
+      <Sheet
+        open={whySheet != null}
+        onClose={() => setWhySheet(null)}
+        title={whySheet != null ? `Why ${logger[whySheet].target?.load} × ${logger[whySheet].target?.reps}?` : ''}
+      >
+        {whySheet != null && logger[whySheet].target && (
+          <div>
+            <div className="flex flex-col gap-2">
+              {[...logger[whySheet].target.rationale, ...(dayRx?.rationale ?? [])].map((r, i) => (
+                <div key={i} className="rounded-xl bg-surface-3 px-3.5 py-2.5">
+                  <p className="text-[13px] leading-snug text-ink">{r.text}</p>
+                  {REFERENCES[r.ref] && (
+                    <p className="mt-1 text-[10px] leading-snug text-ink-3">{REFERENCES[r.ref]}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[10px] text-ink-3">
+              Deterministic model — same inputs, same answer. Methodology: docs/ALGORITHM.md
+            </p>
+          </div>
+        )}
       </Sheet>
 
       <Sheet

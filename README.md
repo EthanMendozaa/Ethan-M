@@ -55,7 +55,8 @@ macros), an activity logger, start-workout, and log-weigh-in.
 | Path | What it is |
 |---|---|
 | `src/lib/seed.js` | Deterministic 90-day world generator (persona, correlations) |
-| `src/lib/derived.js` | All the "intelligence": trend weight, TDEE, 4 scores, muscle recovery, readiness, e1RM, XP |
+| `src/lib/engine.js` | Prescription engine: evidence-based set targets from history + HRV + sleep + energy balance (see `docs/ALGORITHM.md`) |
+| `src/lib/derived.js` | Derived metrics: trend weight, TDEE, 4 scores, muscle recovery, readiness, e1RM, XP |
 | `src/lib/insights.js` | Stats cards computed from the data (null if unsupported) |
 | `src/lib/store.jsx` | Seed + localStorage overlay of user actions |
 | `src/screens/` | Today, Nutrition, Train, Stats, Profile + WeightDetail overlay |
