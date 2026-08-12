@@ -118,6 +118,13 @@ export default function Today({ onNavigate, onOpenWeight }) {
             <p className="text-[12px] font-medium text-ink-3">{longDate(todayKey)}</p>
             <h1 className="text-[24px] font-bold text-ink">Good morning, Ethan</h1>
           </div>
+          <button
+            onClick={() => onNavigate('profile')}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-series-1/20 text-[15px] font-bold text-series-1"
+            aria-label="Profile"
+          >
+            E
+          </button>
         </div>
         <button
           onClick={() => setSheet('sync')}

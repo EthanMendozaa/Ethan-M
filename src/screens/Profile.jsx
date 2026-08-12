@@ -50,7 +50,7 @@ function Row({ label, value, onClick }) {
   )
 }
 
-export default function Profile() {
+export default function Profile({ onNavigate }) {
   const { days, userState, dispatch, resetDemo } = useStore()
   const toast = useToast()
   const [sheet, setSheet] = useState(null)
@@ -65,6 +65,15 @@ export default function Profile() {
 
   return (
     <div className="pt-2">
+      <button
+        onClick={() => onNavigate?.('today')}
+        className="mb-2 flex items-center gap-1 px-1 text-[13px] text-ink-3"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M14.5 5 8 12l6.5 7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Today
+      </button>
       <header className="mb-4 flex items-center gap-3 px-1">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-series-1/20 text-[20px] font-bold text-series-1">
           E

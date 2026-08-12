@@ -7,6 +7,18 @@ const TABS = [
     ),
   },
   {
+    id: 'train',
+    label: 'Train',
+    icon: (
+      <path
+        d="M6.5 8.5v7M4 10v4M17.5 8.5v7M20 10v4M6.5 12h11"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+    ),
+  },
+  { id: 'plus', center: true },
+  {
     id: 'nutrition',
     label: 'Nutrition',
     icon: (
@@ -18,7 +30,6 @@ const TABS = [
       />
     ),
   },
-  { id: 'train', label: 'Train', center: true },
   {
     id: 'stats',
     label: 'Stats',
@@ -26,37 +37,21 @@ const TABS = [
       <path d="M4 20V14M10 20V9M16 20v-4M22 20V5" strokeWidth="1.8" strokeLinecap="round" transform="translate(-1 0)" />
     ),
   },
-  {
-    id: 'profile',
-    label: 'Profile',
-    icon: (
-      <path
-        d="M12 11.5a3.8 3.8 0 1 0 0-7.6 3.8 3.8 0 0 0 0 7.6ZM5 20.2c.8-3.4 3.6-5.2 7-5.2s6.2 1.8 7 5.2"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    ),
-  },
 ]
 
-export default function TabBar({ active, onChange }) {
+export default function TabBar({ active, onChange, onPlus }) {
   return (
     <nav className="relative z-10 flex items-end justify-around border-t border-hairline bg-page/95 px-2 pb-5 pt-2 backdrop-blur">
       {TABS.map((tab) =>
         tab.center ? (
           <button
             key={tab.id}
-            onClick={() => onChange(tab.id)}
+            onClick={onPlus}
             className="relative -top-4 flex h-14 w-14 items-center justify-center rounded-full bg-series-1 text-white shadow-lg shadow-series-1/30 active:scale-95 transition-transform"
-            aria-label="Train"
+            aria-label="Quick add"
           >
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path
-                d="M6.5 8.5v7M4 10v4M17.5 8.5v7M20 10v4M6.5 12h11"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-              />
+              <path d="M12 5v14M5 12h14" strokeWidth="2.4" strokeLinecap="round" />
             </svg>
           </button>
         ) : (

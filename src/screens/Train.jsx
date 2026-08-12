@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../lib/store'
 import {
   readiness,
@@ -87,7 +87,7 @@ function buildLoggerState(plannedSession, ready) {
   })
 }
 
-export default function Train() {
+export default function Train({ autoStart = false, onAutoStarted }) {
   const { days, today, plannedSession, dispatch, todayKey, userState } = useStore()
   const toast = useToast()
   const [view, setView] = useState('home') // home | active | summary
@@ -118,6 +118,15 @@ export default function Train() {
     }
     setView('active')
   }
+
+  // "Start workout" from the + launcher — consume the flag once
+  useEffect(() => {
+    if (autoStart) {
+      onAutoStarted?.()
+      if (plannedSession && !today.session && view !== 'active') startSession()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart])
 
   function finishSession() {
     const session = {

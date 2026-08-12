@@ -18,17 +18,10 @@ import {
   macroTargets,
   weightJourney,
 } from '../lib/derived'
-import { Card, Chip, SectionTitle, useToast } from '../components/ui'
+import { Card, Chip, SectionTitle } from '../components/ui'
 import Sheet from '../components/Sheet'
 import Sparkline from '../components/Sparkline'
 import { AXIS, GRID, ChartTooltip } from '../components/charts'
-
-const QUICK_FOODS = [
-  { name: 'Whey shake', kcal: 180, p: 32, c: 6, f: 3 },
-  { name: 'Chicken & rice', kcal: 520, p: 45, c: 62, f: 9 },
-  { name: 'Protein bar', kcal: 210, p: 20, c: 22, f: 7 },
-  { name: 'Apple + PB', kcal: 270, p: 8, c: 32, f: 13 },
-]
 
 function MacroBar({ label, eaten, target, colorVar }) {
   const pct = Math.min(100, (eaten / target) * 100)
@@ -58,11 +51,9 @@ const SLOT_LABELS = {
   logged: 'Quick add',
 }
 
-export default function Nutrition({ onOpenWeight }) {
-  const { days, today, todayKey, dispatch } = useStore()
-  const toast = useToast()
+export default function Nutrition({ onOpenWeight, onAddFood }) {
+  const { days, today } = useStore()
   const [sheet, setSheet] = useState(null)
-  const [showQuickAdd, setShowQuickAdd] = useState(false)
 
   const checkIn = useMemo(() => weeklyCheckIn(days), [days])
   const targets = useMemo(() => macroTargets(checkIn?.newTarget ?? 2050), [checkIn])
@@ -83,12 +74,6 @@ export default function Nutrition({ onOpenWeight }) {
   )
 
   const remaining = targets.kcal - today.intake.kcal
-
-  function addFood(item) {
-    dispatch({ type: 'addFood', key: todayKey, item })
-    setShowQuickAdd(false)
-    toast(`Logged ${item.name} · +${item.kcal} kcal`)
-  }
 
   return (
     <div className="pt-2">
@@ -216,7 +201,7 @@ export default function Nutrition({ onOpenWeight }) {
       <SectionTitle
         right={
           <button
-            onClick={() => setShowQuickAdd(true)}
+            onClick={() => onAddFood('search')}
             className="rounded-full bg-series-1 px-3 py-1 text-[12px] font-semibold text-white"
           >
             + Add food
@@ -244,29 +229,6 @@ export default function Nutrition({ onOpenWeight }) {
           </Card>
         ))}
       </div>
-
-      <Sheet open={showQuickAdd} onClose={() => setShowQuickAdd(false)} title="Quick add">
-        <div className="flex flex-col gap-2">
-          {QUICK_FOODS.map((f) => (
-            <button
-              key={f.name}
-              onClick={() => addFood(f)}
-              className="flex items-center justify-between rounded-xl bg-surface-3 px-4 py-3 text-left"
-            >
-              <span className="text-[14px] font-medium text-ink">{f.name}</span>
-              <span className="text-[12px] text-ink-3">
-                {f.kcal} kcal · {f.p}g protein
-              </span>
-            </button>
-          ))}
-          <button className="mt-1 flex items-center justify-center gap-2 rounded-xl border border-dashed border-surface-3 px-4 py-3 text-[13px] text-ink-3">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3M7 12h.5M11 12h.5M15 12h.5" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-            Scan barcode (demo)
-          </button>
-        </div>
-      </Sheet>
 
       <Sheet open={sheet === 'tdee'} onClose={() => setSheet(null)} title="Why did this change?">
         <p>

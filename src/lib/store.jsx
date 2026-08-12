@@ -11,6 +11,7 @@ const STORAGE_KEY = `fitmock.v${SEED_VERSION}`
 const defaultUserState = {
   weighIns: {}, // { 'YYYY-MM-DD': lb }
   extraMeals: {}, // { 'YYYY-MM-DD': [mealItem] }
+  activities: {}, // { 'YYYY-MM-DD': [{ type, minutes, kcal }] }
   completedSession: null, // { key, session } — today's logged workout
   bonusXP: 0,
   activeProgramId: 'arnold-split',
@@ -42,6 +43,13 @@ function reducer(state, action) {
       return {
         ...state,
         extraMeals: { ...state.extraMeals, [action.key]: [...list, action.item] },
+      }
+    }
+    case 'logActivity': {
+      const list = state.activities[action.key] ?? []
+      return {
+        ...state,
+        activities: { ...state.activities, [action.key]: [...list, action.activity] },
       }
     }
     case 'completeWorkout':
@@ -103,6 +111,14 @@ export function StoreProvider({ children }) {
             carbs: out.intake.carbs + extraMeal.c,
             fat: out.intake.fat + extraMeal.f,
           },
+        }
+      }
+      const acts = userState.activities[d.key]
+      if (acts?.length) {
+        out = {
+          ...out,
+          activeCal: out.activeCal + acts.reduce((s, a) => s + a.kcal, 0),
+          zoneMinutes: out.zoneMinutes + acts.reduce((s, a) => s + Math.round(a.minutes * 0.7), 0),
         }
       }
       if (userState.completedSession?.key === d.key) {

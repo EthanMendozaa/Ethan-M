@@ -23,6 +23,11 @@ npm i && npm run dev
 
 Builds as a static site (`npm run build`) — deployable straight to Vercel.
 
+The center **+** button is the quick-add hub: search a ~45-item food database
+(with serving multipliers), scan/capture mocks, an offline "describe your
+meal" macro estimator, meal templates (including generate-from-remaining-
+macros), an activity logger, start-workout, and log-weigh-in.
+
 ## Try the cross-learning loops
 
 1. **Today → Weigh-in:** enter a weight; watch the trend + TDEE nudge instantly
